@@ -47,7 +47,7 @@ function App() {
 
   const selectedCall = calls.find((c) => c.id === selectedId) ?? null
 
-  const criticalCalls = calls.filter((c) => c.severity === "severe" && !c.resolved)
+  const criticalCalls = calls.filter((c) => c.severity === "critical" && !c.resolved)
 
   const handleResolved = (updated: Call) => {
     setCalls((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))

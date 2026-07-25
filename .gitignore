@@ -27,3 +27,13 @@ frontend/.vite/
 
 # Logs
 *.log
+
+# Synthetic corpus outputs (regenerated from scripts; not committed until the
+# rubric is filled/signed and a real generation run is reviewed).
+data/generated/*.jsonl
+data/splits/*.jsonl
+data/splits/manifest.json
+data/ratings/*.csv
+data/results/*
+!data/**/.gitkeep
+data/runtime_fewshot.jsonl

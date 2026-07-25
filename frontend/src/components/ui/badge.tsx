@@ -9,10 +9,10 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: "border-transparent bg-[#1A1A1A] text-white",
-        severe: "border-transparent bg-severity-severe text-white",
-        emergent: "border-transparent bg-severity-emergent text-white",
-        "semi-urgent": "border-transparent bg-severity-semi-urgent text-white",
-        "non-urgent": "border-transparent bg-severity-non-urgent text-white",
+        critical: "border-transparent bg-severity-critical text-white",
+        urgent: "border-transparent bg-severity-urgent text-white",
+        routine: "border-transparent bg-severity-routine text-white",
+        fyi: "border-transparent bg-severity-fyi text-white",
         outline: "border-[#E5E2DC] text-[#1A1A1A]",
       },
     },

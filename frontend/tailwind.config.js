@@ -11,10 +11,10 @@ export default {
         "text-primary": "#1A1A1A",
         "text-secondary": "#6B6B6B",
         severity: {
-          severe: "#C73E3A",
-          emergent: "#E07A1F",
-          "semi-urgent": "#3A5FC7",
-          "non-urgent": "#6B6B6B",
+          critical: "#C73E3A",
+          urgent: "#E07A1F",
+          routine: "#3A5FC7",
+          fyi: "#6B6B6B",
         },
       },
       fontFamily: {

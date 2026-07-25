@@ -29,7 +29,10 @@ def _migrate_sqlite_columns() -> None:
 
     existing = {col["name"] for col in inspector.get_columns("calls")}
     additions = {
-        "severity": "VARCHAR DEFAULT 'non-urgent'",
+        "channel": "VARCHAR DEFAULT 'voicemail'",
+        "no_callback": "BOOLEAN DEFAULT 0",
+        "insufficient_detail": "BOOLEAN DEFAULT 0",
+        "severity": "VARCHAR DEFAULT 'fyi'",
         "patient_name": "VARCHAR DEFAULT 'Unknown'",
         "room": "VARCHAR DEFAULT ''",
         "caller_name": "VARCHAR DEFAULT ''",
