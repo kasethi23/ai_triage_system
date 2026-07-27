@@ -1,4 +1,4 @@
-export type Severity = "severe" | "emergent" | "semi-urgent" | "non-urgent"
+export type Severity = "critical" | "urgent" | "routine" | "fyi"
 
 export interface Call {
   id: number
@@ -7,8 +7,11 @@ export interface Call {
   received_at: string
   audio_path: string
   transcript: string
+  channel: string
   urgency: string
   request_type: string
+  no_callback: boolean
+  insufficient_detail: boolean
   confidence: number
   summary: string
   suggested_action: string

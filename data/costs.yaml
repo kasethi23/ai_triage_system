@@ -1,0 +1,9 @@
+# Relative cost of each classification error.
+# PLACEHOLDER VALUES — to be elicited from the partner physician (data need N4).
+# Do not report cost-weighted results as clinically grounded until replaced.
+# Ratios express cost relative to a single unnecessary interruption (= 1).
+missed_critical: 100      # Critical classified below Critical
+missed_urgent: 20         # Urgent classified as Routine or FYI
+unnecessary_interrupt: 1  # Routine or FYI classified as Critical or Urgent
+over_triage_one_tier: 0.5 # any single-tier upward error not covered above
+insufficient_detail_guessed: 20  # insufficient_detail not flagged (NFR1 failure)

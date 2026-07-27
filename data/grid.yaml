@@ -1,0 +1,119 @@
+# Generation grid for the synthetic EP call corpus (Task 5).
+#
+# Design note: a full Cartesian enumeration of
+#   caller_role x request_type x severity x channel x time_of_day x clinical_topic
+# is tens of thousands of cells for a 400-record corpus, so this file is
+# DECLARATIVE rather than a hand-listed count-per-cell table. It defines the
+# dimensions, sampling weights, pruning rules, and per-tier totals; the deterministic
+# expansion into concrete cells (and the count assigned to each) is done by
+# generate_calls.py under `seed`. Every generated record still records its full
+# `generation_cell`, so provenance is exact even though the cells are sampled.
+#
+# Scope: electrophysiology only (Amendment H). All topics below are EP.
+
+seed: 20250724
+
+# --- Corpus size (Amendment I) ----------------------------------------------
+# GENERATION counts, deliberately distorted from true prevalence:
+#   - critical oversampled ~10x vs its ~2% prevalence, so recall on critical
+#     (the headline metric) has enough test cases for a usable CI.
+#   - the boundary tiers urgent and routine carry the most volume because they
+#     are where the classifier fails.
+tier_counts:
+  critical: 80    # 20%
+  urgent: 120     # 30%
+  routine: 120    # 30%
+  fyi: 80         # 20%
+total: 400
+
+# --- True prevalence (rubric.md §8) -----------------------------------------
+# SEPARATE from tier_counts. Metrics are reweighted against these or the
+# headline numbers are wrong. These are estimates — the call metadata (N1) has
+# no content and therefore no labels. Replace with rubric §8 once filled/signed.
+prevalence:
+  critical: 0.02   # TODO: confirm against rubric §8
+  urgent: 0.13     # TODO
+  routine: 0.45    # TODO
+  fyi: 0.40        # TODO
+
+# --- Dimensions --------------------------------------------------------------
+dimensions:
+  caller_role:
+    - CCU nurse
+    - ward nurse
+    - device-clinic NP
+    - OR nurse
+    - referring ED physician
+    - community cardiologist
+    - pharmacy
+    - patient family
+  request_type:
+    - medication
+    - lab_result
+    - patient_status
+    - consult
+    - scheduling
+    - operational
+    - other
+  channel: [text, voicemail, phone]
+  time_of_day: [overnight, morning, afternoon, evening]
+
+# Clinical topics (Amendment H), each mapped to the severity tiers at which it
+# is clinically coherent. This prunes the topic x severity cross-product:
+# electrical storm is never fyi, ablation referral is never critical.
+clinical_topics:
+  af_rvr: [critical, urgent, routine]
+  vt_vf: [critical, urgent]
+  electrical_storm: [critical]
+  bradycardia_heart_block: [critical, urgent, routine]
+  svt: [urgent, routine]
+  inappropriate_icd_shock: [urgent, routine]   # stable patient can be routine (generalisation test, Amendment H)
+  lead_malfunction: [urgent, routine]
+  device_infection: [urgent, routine]
+  pocket_hematoma: [urgent, routine]
+  remote_transmission_alert: [urgent, routine, fyi]
+  post_ablation_groin_complication: [critical, urgent, routine]
+  cardiac_tamponade: [critical]
+  phrenic_nerve_injury: [urgent, routine]
+  anticoagulation_bleeding: [critical, urgent, routine]
+  syncope: [urgent, routine]
+  ablation_referral: [routine, fyi]
+  device_interrogation: [routine, fyi]
+  generator_change: [routine, fyi]
+
+# --- Sampling weights (Amendment C — ground in measured data) ----------------
+# Load is daytime-weighted, peaking ~16:00 with a light overnight tail
+# (11 overnight vs 42 at peak in the measured CCU week).
+weights:
+  time_of_day:
+    overnight: 0.12
+    morning: 0.26
+    afternoon: 0.42
+    evening: 0.20
+  # Calls and texts both run high on service (~41 calls, ~110 texts/day), so
+  # text must NOT be a minority channel.
+  channel:
+    text: 0.50
+    voicemail: 0.20
+    phone: 0.30
+
+# --- Pruning: clinically impossible role x request_type combos ---------------
+prune_role_request:
+  - {caller_role: patient family, request_type: operational}
+  - {caller_role: pharmacy, request_type: consult}
+  - {caller_role: patient family, request_type: lab_result}
+  - {caller_role: patient family, request_type: consult}
+  - {caller_role: pharmacy, request_type: operational}
+
+# --- Arrival bursts (Amendment D) --------------------------------------------
+# 49% of measured calls arrived within 5 min of another; 21 bursts of >=3 in the
+# measured week. Bursts are a load-bearing case, not an edge case.
+bursts:
+  min_bursts: 12
+  size_range: [3, 4]
+  window_minutes: 5
+  must_span_tiers: 2       # each burst spans >= 2 severity tiers
+  must_include_fyi: true   # and includes >= 1 fyi — the partner's named failure
+
+# --- Degradation target (Task 7 / Amendment I) -------------------------------
+degrade_fraction: 0.30     # ~120 of 400 records

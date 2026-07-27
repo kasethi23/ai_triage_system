@@ -25,8 +25,15 @@ class Call(Base):
     suggested_action: Mapped[str] = mapped_column(Text, default="")
     raw_classification_json: Mapped[str] = mapped_column(Text, default="")
 
+    # Ingestion channel — set from the ingestion path, not LLM-inferred.
+    channel: Mapped[str] = mapped_column(String, default="voicemail")
+
+    # LLM-inferred triage flags.
+    no_callback: Mapped[bool] = mapped_column(Boolean, default=False)
+    insufficient_detail: Mapped[bool] = mapped_column(Boolean, default=False)
+
     # Conduit Physician Console fields
-    severity: Mapped[str] = mapped_column(String, default="non-urgent")
+    severity: Mapped[str] = mapped_column(String, default="fyi")
     patient_name: Mapped[str] = mapped_column(String, default="Unknown")
     room: Mapped[str] = mapped_column(String, default="")
     caller_name: Mapped[str] = mapped_column(String, default="")
