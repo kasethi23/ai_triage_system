@@ -98,7 +98,7 @@ python scripts/evaluate.py --mock                    # offline metrics smoke tes
 
 - Env/secrets live in `.env` (gitignored). Never commit real credentials or the
   partner attending's real name; generation uses a placeholder and asserts against
-  a `--forbid-name` list (Amendment G 13.5).
+  a `--forbid-name` list (privacy spec P10).
 - Regenerated corpus data (`data/generated/*.jsonl`, `splits/*.jsonl`,
   `ratings/*.csv`, `results/*`) is gitignored; commit it only after a reviewed real run.
 - sqlite schema changes: add the column to `models.py` AND to the `additions` dict
@@ -109,6 +109,8 @@ python scripts/evaluate.py --mock                    # offline metrics smoke tes
 - **Task 12 / Amendment F** — correction feedback loop (`corrections` table,
   `promote_corrections.py`, few-shot injection). evaluate.py's leakage guard is
   already wired for it.
-- **Task 13 / Amendment G** — de-identification. 13.1 (identifier-table split) and
-  13.4 (`SECURITY.md`) are not deferred; 13.2 redaction / 13.3-local-Whisper may be
-  designed-but-not-enabled.
+- **Privacy architecture** — de-identification, auth, CORS, Twilio signature
+  validation, audio retention, and view logging. This supersedes and replaces the
+  old dataset-spec Task 13 / Amendment G, which is removed. See
+  `docs/specs/SPEC_privacy_architecture.md` (tasks P1–P10). Not yet implemented;
+  the physician-name generation guard (P10) is the only part already present.
