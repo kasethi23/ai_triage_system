@@ -32,3 +32,23 @@ class Call(Base):
     caller_name: Mapped[str] = mapped_column(String, default="")
     caller_role: Mapped[str] = mapped_column(String, default="")
     resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Device(Base):
+    """An iOS device registered to receive APNs push notifications.
+
+    Any new column/table must be added in BOTH this file AND
+    app/database.py::_migrate_sqlite_columns (repo convention).
+    """
+
+    __tablename__ = "devices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    token: Mapped[str] = mapped_column(String, unique=True, index=True)
+    platform: Mapped[str] = mapped_column(String, default="ios")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )

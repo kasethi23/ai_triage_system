@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.config import AUDIO_STORAGE_DIR
 from app.models import Call
 from app.services.classification import classify_transcript
+from app.services.push import dispatch_push_for_call
 from app.services.transcription import transcribe_audio
 
 
@@ -54,6 +55,11 @@ def process_call_recording(
     db.add(call)
     db.commit()
     db.refresh(call)
+
+    # Dispatch APNs push per the policy in app/services/push.py. This runs for
+    # both real Twilio calls and seed_demo.py runs. It never raises, so a push
+    # failure can never break call ingestion.
+    dispatch_push_for_call(db, call_to_dict(call))
 
     return call
 
