@@ -62,16 +62,24 @@ for what data is allowed in a push payload.
 The native app lives in `ios/`. It is notification-first: critical/urgent
 calls reach the locked phone via APNs time-sensitive push.
 
+**First time?** Follow the step-by-step guide in **`ios/README.md`** — it
+covers prerequisites, starting the backend, generating the project, running
+in the simulator (including how to scroll and test pushes), and
+troubleshooting.
+
+Short version:
+
 ```bash
 brew install xcodegen        # once
 cd ios
 xcodegen generate            # produces ClinRoute.xcodeproj (gitignored)
-open ClinRoute.xcodeproj
+open ClinRoute.xcodeproj     # pick an iPhone simulator, Cmd-R
 ```
 
-Set the backend URL and bearer token in `ios/ClinRoute/Config.swift`, then
-build and run on a device (push requires real hardware; the simulator can
-test payload handling via `xcrun simctl push` — see `ios/TESTING.md`).
+Set the backend URL and bearer token in `ios/ClinRoute/Config.swift` when
+targeting a deployed backend (local dev works with the defaults). Real APNs
+push requires physical hardware; the simulator tests payload handling via
+`xcrun simctl push` — see `ios/TESTING.md`.
 
 ## Endpoints
 
