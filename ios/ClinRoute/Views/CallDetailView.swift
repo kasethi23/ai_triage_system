@@ -1,4 +1,3 @@
-import AVFoundation
 import SwiftUI
 
 struct CallDetailView: View {
@@ -6,11 +5,8 @@ struct CallDetailView: View {
 
     @Environment(CallStore.self) private var store
     @State private var call: Call?
-    @State private var player: AVPlayer?
-    @State private var isPlaying = false
+    @State private var player = VoicemailPlayer()
     @State private var isResolving = false
-
-    private let api = APIClient()
 
     var body: some View {
         Group {
@@ -32,114 +28,149 @@ struct CallDetailView: View {
             }
         }
         .onDisappear {
-            player?.pause()
+            player.stop()
         }
     }
 
     @ViewBuilder
     private func content(for call: Call) -> some View {
-        List {
-            Section {
-                HStack {
-                    SeverityBadge(severity: call.severity)
-                    Spacer()
-                    Text(call.relativeReceivedTime)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                card {
+                    HStack {
+                        SeverityBadge(severity: call.severity)
+                        Spacer()
+                        Text(call.relativeReceivedTime)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    detailRow("Patient", call.patientName)
+                    if !call.room.isEmpty {
+                        detailRow("Room", call.room)
+                    }
+                    if !call.callerName.isEmpty {
+                        detailRow("Caller", callerDescription(call))
+                    }
+                    detailRow("Confidence", call.confidence.formatted(.percent.precision(.fractionLength(0))))
                 }
-                LabeledContent("Patient", value: call.patientName)
-                if !call.room.isEmpty {
-                    LabeledContent("Room", value: call.room)
+
+                sectionHeader("Summary")
+                card {
+                    Text(call.summary)
                 }
-                if !call.callerName.isEmpty {
-                    LabeledContent("Caller", value: callerDescription(call))
+
+                if !call.suggestedAction.isEmpty {
+                    sectionHeader("Suggested action")
+                    card {
+                        Text(call.suggestedAction)
+                    }
                 }
-                LabeledContent("Confidence", value: call.confidence.formatted(.percent.precision(.fractionLength(0))))
-            }
 
-            Section("Summary") {
-                Text(call.summary)
-            }
-
-            if !call.suggestedAction.isEmpty {
-                Section("Suggested action") {
-                    Text(call.suggestedAction)
-                }
-            }
-
-            Section("Recording") {
-                Button {
-                    togglePlayback(for: call)
-                } label: {
-                    Label(isPlaying ? "Pause" : "Play voicemail",
-                          systemImage: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                }
-            }
-
-            Section("Transcript") {
-                Text(call.transcript.isEmpty ? "No transcript available." : call.transcript)
-                    .font(.callout)
-                    .foregroundStyle(call.transcript.isEmpty ? .secondary : .primary)
-            }
-
-            Section {
-                if !call.resolved {
+                sectionHeader("Recording")
+                card {
                     Button {
-                        Task {
-                            isResolving = true
-                            _ = await store.resolve(call)
-                            isResolving = false
-                        }
+                        Task { await player.toggle(callID: call.id) }
                     } label: {
+                        if player.isLoading {
+                            ProgressView()
+                        } else {
+                            Label(player.isPlaying ? "Pause" : "Play voicemail",
+                                  systemImage: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        }
+                    }
+                    .disabled(player.isLoading)
+                    if let message = player.errorMessage {
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                sectionHeader("Transcript")
+                card {
+                    Text(call.transcript.isEmpty ? "No transcript available." : call.transcript)
+                        .font(.callout)
+                        .foregroundStyle(call.transcript.isEmpty ? .secondary : .primary)
+                }
+
+                actionButtons(for: call)
+            }
+            .padding()
+        }
+        .background(Color(.systemGroupedBackground))
+    }
+
+    @ViewBuilder
+    private func actionButtons(for call: Call) -> some View {
+        VStack(spacing: 10) {
+            if !call.resolved {
+                Button {
+                    Task {
+                        isResolving = true
+                        _ = await store.resolve(call)
+                        isResolving = false
+                    }
+                } label: {
+                    Group {
                         if isResolving {
                             ProgressView()
-                                .frame(maxWidth: .infinity)
                         } else {
                             Label("Resolve", systemImage: "checkmark.circle.fill")
-                                .frame(maxWidth: .infinity)
                         }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isResolving)
-                } else {
-                    Label("Resolved", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isResolving)
+            } else {
+                Label("Resolved", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .frame(maxWidth: .infinity)
+            }
+
+            if !call.fromNumber.isEmpty,
+               let telURL = URL(string: "tel:\(call.fromNumber.filter { !$0.isWhitespace })") {
+                Link(destination: telURL) {
+                    Label("Call back \(call.fromNumber)", systemImage: "phone.fill")
                         .frame(maxWidth: .infinity)
                 }
-
-                if !call.fromNumber.isEmpty,
-                   let telURL = URL(string: "tel:\(call.fromNumber.filter { !$0.isWhitespace })") {
-                    Link(destination: telURL) {
-                        Label("Call back \(call.fromNumber)", systemImage: "phone.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                }
+                .buttonStyle(.bordered)
             }
-            .listRowBackground(Color.clear)
+        }
+        .padding(.top, 4)
+    }
+
+    // MARK: - Building blocks
+
+    @ViewBuilder
+    private func card(@ViewBuilder _ content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .padding(.leading, 4)
+    }
+
+    private func detailRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+            Spacer()
+            Text(value)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
         }
     }
 
     private func callerDescription(_ call: Call) -> String {
         call.callerRole.isEmpty ? call.callerName : "\(call.callerName) (\(call.callerRole))"
-    }
-
-    private func togglePlayback(for call: Call) {
-        if let player, isPlaying {
-            player.pause()
-            isPlaying = false
-            return
-        }
-        if player == nil {
-            // Attach the bearer header at the asset layer — AVPlayer streams
-            // the protected audio endpoint directly.
-            let asset = AVURLAsset(
-                url: api.audioURL(for: call.id),
-                options: ["AVURLAssetHTTPHeaderFieldsKey": api.authHeaders]
-            )
-            player = AVPlayer(playerItem: AVPlayerItem(asset: asset))
-        }
-        player?.play()
-        isPlaying = true
     }
 }

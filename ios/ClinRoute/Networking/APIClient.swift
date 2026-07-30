@@ -64,10 +64,16 @@ struct APIClient {
         return (try? JSONSerialization.jsonObject(with: data) as? [String: String?]) ?? [:]
     }
 
-    /// URL for streaming a call's audio. The bearer header is attached at the
-    /// AVURLAsset layer (see CallDetailView), not here.
+    /// URL of a call's audio endpoint.
     func audioURL(for callID: Int) -> URL {
         baseURL.appending(path: "calls/\(callID)/audio")
+    }
+
+    /// Downloads a call's voicemail audio (bearer-authenticated). Recordings
+    /// are small WAVs, so download-then-play beats streaming — the backend
+    /// doesn't support the range requests AVPlayer streaming needs.
+    func audioData(for callID: Int) async throws -> Data {
+        try await perform(makeRequest(path: "calls/\(callID)/audio", method: "GET"))
     }
 
     var authHeaders: [String: String] {

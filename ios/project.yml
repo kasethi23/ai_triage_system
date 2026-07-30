@@ -38,6 +38,10 @@ targets:
         # Background Modes: remote notifications.
         UIBackgroundModes:
           - remote-notification
+        # Allow plain-HTTP to localhost for local dev (Config.baseURL);
+        # production backends are https so this exemption never applies.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
 
 schemes:
   ClinRoute:
