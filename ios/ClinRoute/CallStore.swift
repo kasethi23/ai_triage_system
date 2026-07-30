@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 
 /// Shared source of truth for calls. Injected via the SwiftUI environment.
 @Observable
@@ -18,9 +19,19 @@ final class CallStore {
         do {
             calls = try await api.listCalls()
             lastError = nil
+            await syncBadge()
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    /// Badge = unresolved critical+urgent count. The server sends the same
+    /// number in push payloads; this keeps it current after local changes.
+    private func syncBadge() async {
+        let count = calls.filter {
+            !$0.resolved && ($0.severity == .severe || $0.severity == .emergent)
+        }.count
+        try? await UNUserNotificationCenter.current().setBadgeCount(count)
     }
 
     /// Returns the call from the cache, fetching it if unknown (e.g. arriving
@@ -47,6 +58,7 @@ final class CallStore {
         do {
             let updated = try await api.resolveCall(id: call.id)
             upsert(updated)
+            await syncBadge()
             return true
         } catch {
             calls[index] = original
