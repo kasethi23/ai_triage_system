@@ -229,8 +229,8 @@ def _assert_no_forbidden_name(transcript: str, forbidden: list[str], rec_id: str
     for name in forbidden:
         if name and name.lower() in low:
             raise SystemExit(
-                f"[13.5] record {rec_id} contains forbidden physician name '{name}'. "
-                "Regenerate; real names must never enter the repo."
+                f"[privacy P10] record {rec_id} contains forbidden physician name "
+                f"'{name}'. Regenerate; real names must never enter the repo."
             )
 
 
@@ -244,7 +244,7 @@ def main() -> None:
         action="append",
         default=[],
         help="Physician real name(s) that must not appear in output (repeatable). "
-        "The team must pass the partner attending's name here (Amendment G 13.5).",
+        "The team must pass the partner attending's name here (privacy spec P10).",
     )
     ap.add_argument("--out", default=str(RAW_PATH), help="Output JSONL path")
     args = ap.parse_args()
