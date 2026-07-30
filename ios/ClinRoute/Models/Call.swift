@@ -102,4 +102,26 @@ extension Call {
         guard let date = receivedDate else { return receivedAt }
         return date.formatted(.relative(presentation: .named))
     }
+
+    /// "9:35" — the inbox time-column value.
+    var arrivalClock: String {
+        guard let date = receivedDate else { return "—" }
+        return date.formatted(.dateTime.hour(.defaultDigits(amPM: .omitted)).minute())
+    }
+
+    /// "AM" / "PM" — the time-column unit line.
+    var arrivalMeridiem: String {
+        guard let date = receivedDate else { return "" }
+        return date.formatted(.dateTime.hour(.defaultDigits(amPM: .wide))).filter(\.isLetter)
+    }
+
+    /// "6 min" / "3 h" / "12 d" — elapsed since arrival, for "waiting {elapsed}".
+    var elapsedSinceArrival: String {
+        guard let date = receivedDate else { return "" }
+        let minutes = max(0, Int(Date.now.timeIntervalSince(date) / 60))
+        if minutes < 60 { return "\(minutes) min" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours) h" }
+        return "\(hours / 24) d"
+    }
 }

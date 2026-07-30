@@ -42,6 +42,22 @@ targets:
         # production backends are https so this exemption never applies.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        # Organic design system fonts (Google Fonts, OFL) — see Theme/OrganicTheme.swift.
+        UIAppFonts:
+          - Caprasimo-Regular.ttf
+          - Figtree-Regular.ttf
+          - Figtree-Bold.ttf
+
+  ClinRouteUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - ClinRouteUITests
+    dependencies:
+      - target: ClinRoute
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.clinroute.console.uitests
 
 schemes:
   ClinRoute:
@@ -50,5 +66,8 @@ schemes:
         ClinRoute: all
     run:
       config: Debug
+    test:
+      targets:
+        - ClinRouteUITests
     archive:
       config: Release

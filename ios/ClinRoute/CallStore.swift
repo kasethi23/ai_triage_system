@@ -88,4 +88,18 @@ final class CallStore {
 
     var unresolved: [Call] { sorted(calls.filter { !$0.resolved }) }
     var resolved: [Call] { sorted(calls.filter(\.resolved)) }
+
+    // Inbox groups (design: oldest arrival first, consistently, in all groups).
+    private func oldestFirst(_ severities: Set<Severity>) -> [Call] {
+        calls.filter { !$0.resolved && severities.contains($0.severity) }
+            .sorted { $0.receivedAt < $1.receivedAt }
+    }
+
+    var criticalGroup: [Call] { oldestFirst([.severe]) }
+    var urgentGroup: [Call] { oldestFirst([.emergent]) }
+    /// Routine and FYI merged — membership in the group is the signal.
+    var laterGroup: [Call] { oldestFirst([.semiUrgent, .nonUrgent]) }
+
+    /// Badge = calls with a callback clock (critical + urgent), not total.
+    var alertingCount: Int { criticalGroup.count + urgentGroup.count }
 }
