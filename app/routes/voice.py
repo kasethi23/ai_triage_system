@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import Response
 from twilio.request_validator import RequestValidator
-from twilio.twiml.voice_response import VoiceResponse
+from twilio.twiml.voice_response import Gather, VoiceResponse
 
 from app import config
 from app.config import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
@@ -64,21 +64,48 @@ router = APIRouter(
     dependencies=[Depends(validate_twilio_signature)],
 )
 
-GREETING = (
-    "Please leave a message for the physician. "
-    "Include your name, your role, the patient's name, "
-    "what's going on, and what you need. "
-    "Recording will stop automatically after ninety seconds."
+# Structured intake, Option B (privacy P5): the bed/room is captured by KEYPAD,
+# so it never becomes audio, never reaches Whisper, and never lands in a
+# transcript — and it is exact (Whisper mangles spoken "bed 512"). The rest is a
+# single natural voicemail; the name in it is handled by redaction (P6).
+ROOM_PROMPT = (
+    "Using your keypad, enter the patient's bed or room number, then press pound. "
+    "If there is no room number, or this is an emergency, press star to skip."
+)
+NARRATIVE_PROMPT = (
+    "Now leave your message for the physician. Include your name, your role, "
+    "the patient's name, what's going on, and what you need. Recording stops "
+    "automatically after ninety seconds."
 )
 
 
 @router.post("/incoming")
 async def incoming_call() -> Response:
-    """Twilio webhook for an incoming call. Greets the caller and records."""
+    """Twilio webhook for an incoming call. Step 1: capture the room by keypad."""
     response = VoiceResponse()
-    response.say(GREETING)
+    gather = Gather(
+        num_digits=6,
+        finish_on_key="#",
+        action="/voice/narrative",
+        method="POST",
+        timeout=8,
+    )
+    gather.say(ROOM_PROMPT)
+    response.append(gather)
+    # If the caller presses nothing (or times out), fall through to the message.
+    response.redirect("/voice/narrative", method="POST")
+    return Response(content=str(response), media_type="application/xml")
+
+
+@router.post("/narrative")
+async def narrative(Digits: str = Form("")) -> Response:
+    """Step 2: record the single narrative voicemail. The keypad room (if any) is
+    carried on the recording callback URL so it never enters the audio."""
+    room = "" if Digits in ("", "*") else Digits
+    response = VoiceResponse()
+    response.say(NARRATIVE_PROMPT)
     response.record(
-        action="/voice/recording",
+        action=f"/voice/recording?room={room}",
         method="POST",
         max_length=90,
         play_beep=True,
@@ -90,30 +117,56 @@ async def incoming_call() -> Response:
 
 @router.post("/recording")
 async def recording_complete(
+    request: Request,
     CallSid: str = Form(...),
     From: str = Form(...),
     RecordingUrl: str = Form(...),
+    RecordingSid: str = Form(""),
 ) -> Response:
     """Twilio webhook fired once a recording is complete.
 
     Downloads the audio, runs it through the transcription + classification
-    pipeline, stores the resulting Call row, and broadcasts an SSE event.
-    """
+    pipeline (with the keypad room as a known identifier), stores the Call,
+    broadcasts an SSE event, and deletes Twilio's retained copy (P8)."""
+    room = request.query_params.get("room", "")
     audio_bytes, extension = await _download_recording(RecordingUrl)
 
     db = SessionLocal()
     try:
         call = await asyncio.to_thread(
-            process_call_recording, db, audio_bytes, CallSid, From, extension
+            process_call_recording, db, audio_bytes, CallSid, From, extension, "voicemail", room
         )
     finally:
         db.close()
 
     await broker.publish(call_to_dict(call))
+    # P8: remove Twilio's own retained copy so the audio does not sit at rest on
+    # a third party. Deleting our downloaded copy alone does not close that gap.
+    await _delete_twilio_recording(RecordingSid)
 
     response = VoiceResponse()
     response.hangup()
     return Response(content=str(response), media_type="application/xml")
+
+
+async def _delete_twilio_recording(recording_sid: str) -> None:
+    """Delete a recording from Twilio's storage via the REST API (privacy P8).
+
+    No-op when retention is on or credentials/SID are missing. Never raises —
+    a delete failure must not break the webhook response to Twilio."""
+    if not recording_sid or config.RETAIN_AUDIO:
+        return
+    if not (TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN):
+        return
+    url = (
+        f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_ACCOUNT_SID}"
+        f"/Recordings/{recording_sid}.json"
+    )
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.delete(url, auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN), timeout=30)
+    except Exception:  # noqa: BLE001 — best-effort cleanup
+        logger.warning("Failed to delete Twilio recording %s", recording_sid)
 
 
 async def _download_recording(recording_url: str) -> tuple[bytes, str]:

@@ -21,11 +21,39 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_TRANSCRIPTION_MODEL = os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1")
 OPENAI_CLASSIFICATION_MODEL = os.getenv("OPENAI_CLASSIFICATION_MODEL", "gpt-5-mini")
 
+# --- De-identification (privacy spec P6) ------------------------------------
+# When true, transcripts are redacted (app/services/deident.py) BEFORE they are
+# sent to the classifier, so identifiers never cross the boundary to OpenAI.
+# Default false while the prototype runs on synthetic data; the flag exists so
+# the behaviour is demonstrable and testable. Requires presidio-analyzer,
+# presidio-anonymizer and a local spaCy model.
+DEIDENTIFY_TRANSCRIPTS = os.getenv("DEIDENTIFY_TRANSCRIPTS", "false").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+# --- Audio retention (privacy spec P8) --------------------------------------
+# Voice is biometric and cannot be tokenised, so stored audio is the highest-risk
+# artifact. When false (default), the local recording is deleted after a
+# successful transcription and Twilio's retained copy is deleted via the REST API.
+RETAIN_AUDIO = os.getenv("RETAIN_AUDIO", "false").strip().lower() in ("1", "true", "yes")
+
 # --- API auth ---------------------------------------------------------------
 # Bearer token required on /calls*, /devices*, and the SSE stream. If unset we
 # allow unauthenticated access for local dev (with a loud warning), but never
 # in production (see app/auth.py).
 API_BEARER_TOKEN = os.getenv("API_BEARER_TOKEN", "")
+
+# --- CORS (privacy spec P3) -------------------------------------------------
+# Allowed browser origins for the console. Comma-separated; defaults to the
+# local Vite dev server. Never wildcard — the API serves PHI once real data
+# flows, and a wildcard origin with credentials is disallowed by browsers anyway.
+FRONTEND_ORIGINS = [
+    o.strip()
+    for o in os.getenv("FRONTEND_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+    if o.strip()
+]
 
 # --- Storage (env-driven, defaults to the Railway /data volume in prod) ------
 DATABASE_URL = os.getenv("DATABASE_URL") or (

@@ -183,11 +183,27 @@ python scripts/evaluate.py               # or --mock for an offline metrics smok
 `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_USE_SANDBOX`. Full env table in
 `README.md`; security & data-handling in `SECURITY.md`.
 
-## Not yet implemented (remaining spec work)
+## Privacy architecture (P1–P10, implemented)
 
-- **Privacy architecture** — de-identification (Presidio), CORS lockdown, audio
-  retention, re-identification + view logging, and structured intake. Note: bearer
-  auth (`app/auth.py`) and Twilio-signature validation are already present from the
-  iOS workstream and partially satisfy privacy-spec P2/P1. See
-  `docs/specs/SPEC_privacy_architecture.md` (tasks P1–P10) and
-  `docs/RECONCILIATION_PLAN.md`.
+See `docs/specs/SPEC_privacy_architecture.md` and `SECURITY.md`. All gated behind
+config flags, default off, so synthetic-data workflows are unaffected.
+
+- **P1** Twilio `X-Twilio-Signature` validation (`voice.py`); **P2** bearer auth
+  (`auth.py`); **P3** CORS locked to `FRONTEND_ORIGINS`.
+- **P4** identifiers split into `call_identifiers`; the `calls` row and `call_to_dict`
+  carry none (clean by construction). **P7** `GET /calls/{id}/identified` re-joins,
+  restores the transcript, and logs to `call_views`.
+- **P5** structured intake (Option B): keypad room + single voicemail + ★ bypass.
+- **P6** redaction (`deident.py`, Presidio, local spaCy) at `transcribe → redact →
+  classify`, flag `DEIDENTIFY_TRANSCRIPTS`. **P8** audio deleted after transcription
+  (`RETAIN_AUDIO`) + Twilio-copy delete + `scripts/cleanup_audio.py`.
+- **P10** physician-name generation guard (`generate_calls.py`).
+
+**Client follow-up (not backend):** `GET /calls` is now identifier-free — the
+frontend and iOS clients must call `GET /calls/{id}/identified` to show the
+patient's name/room on the detail view. **Deferred:** local Whisper (closes B3),
+encryption at rest, multi-user roles — see SECURITY.md.
+
+Migrations: new tables (`call_identifiers`, `call_views`) are created by
+`Base.metadata.create_all`; per convention, new *columns* also go in
+`database.py::_migrate_sqlite_columns`.
