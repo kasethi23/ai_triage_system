@@ -128,6 +128,8 @@ def test_ingestion_survives_push_failure(monkeypatch, db):
         lambda transcript: {
             "urgency": "urgent",
             "request_type": "patient_status",
+            "no_callback": False,
+            "insufficient_detail": False,
             "confidence": 0.9,
             "summary": "summary",
             "suggested_action": "call back",
