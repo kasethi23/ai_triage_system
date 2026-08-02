@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.config import AUDIO_STORAGE_DIR
 from app.models import Call
 from app.services.classification import classify_transcript
+from app.services.push import dispatch_push_for_call
 from app.services.transcription import transcribe_audio
 
 
@@ -72,12 +73,17 @@ def process_call_recording(
     extension: str = "wav",
     channel: str = "voicemail",
 ) -> Call:
-    """Run the full audio pipeline: save audio, transcribe, classify, persist."""
+    """Run the full audio pipeline: save audio, transcribe, classify, persist, push."""
     audio_path = save_audio_file(audio_bytes, call_sid, extension)
     transcript = transcribe_audio(audio_path)
-    return _classify_and_store(
+    call = _classify_and_store(
         db, transcript, call_sid, from_number, str(audio_path), channel
     )
+    # Dispatch APNs push per the policy in app/services/push.py. Real calls only —
+    # the synthetic text path (process_call_transcript) must never push. Never
+    # raises, so a push failure can never break call ingestion.
+    dispatch_push_for_call(db, call_to_dict(call))
+    return call
 
 
 def process_call_transcript(

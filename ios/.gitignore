@@ -1,0 +1,4 @@
+# The Xcode project is generated from project.yml — never commit it.
+*.xcodeproj
+xcuserdata/
+DerivedData/

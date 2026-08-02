@@ -38,6 +38,19 @@ async def stream_calls() -> StreamingResponse:
     return StreamingResponse(broker.stream(), media_type="text/event-stream")
 
 
+@router.get("/calls/{call_id}")
+def get_call(call_id: int) -> dict:
+    """Return a single call by id."""
+    db = SessionLocal()
+    try:
+        call = db.get(Call, call_id)
+        if call is None:
+            raise HTTPException(status_code=404, detail="Call not found")
+        return call_to_dict(call)
+    finally:
+        db.close()
+
+
 @router.get("/calls/{call_id}/audio")
 def get_call_audio(call_id: int) -> FileResponse:
     """Stream the audio file for a given call."""
