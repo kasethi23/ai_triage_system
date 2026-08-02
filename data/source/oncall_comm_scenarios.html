@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>On-Call Communication: Synthetic Scenario Set</title>
+<style>
+  :root{
+    --ink:#132a43; --slate:#5a6b7d; --paper:#f7f6f2; --line:#d9d5cc;
+    --crit:#b4232a; --urg:#bd7b18; --rout:#2f6d8c; --fyi:#8a8f96;
+    --bubble-in:#eef1f4; --bubble-me:#12324e;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#e9e7e0;color:var(--ink);
+    font-family:"Helvetica Neue",Arial,"Segoe UI",system-ui,sans-serif;line-height:1.5;padding:32px 16px;}
+  .sheet{max-width:880px;margin:0 auto;background:var(--paper);border:1px solid var(--line);
+    box-shadow:0 18px 40px -28px rgba(19,42,67,.55);}
+  .band{background:var(--ink);color:#f4f2ec;padding:26px 40px 22px;}
+  .kicker{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#9fb4c6;margin:0 0 10px;font-weight:600;}
+  h1{font-size:25px;line-height:1.2;margin:0;font-weight:700;letter-spacing:-.01em;}
+  .band p{margin:10px 0 0;color:#c6d2dd;font-size:13.5px;max-width:66ch;}
+  .synthetic{display:inline-block;margin-top:14px;background:#8a3a1e;color:#ffe9dd;
+    font-size:11px;font-weight:700;letter-spacing:.08em;padding:5px 11px;border-radius:3px;text-transform:uppercase;}
+  .body{padding:28px 40px 40px;}
+  .intro{font-size:14.5px;margin:0 0 22px;}
+  /* legend */
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:18px;background:#eef1ee;border:1px solid var(--line);
+    padding:16px 20px;margin-bottom:30px;font-size:12.5px;}
+  .legend h3{margin:0 0 9px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);}
+  .legend .row{display:flex;align-items:center;gap:9px;margin:6px 0;color:var(--ink);}
+  .pill{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;
+    padding:3px 9px;border-radius:20px;text-transform:uppercase;color:#fff;white-space:nowrap;}
+  .pill.crit{background:var(--crit);} .pill.urg{background:var(--urg);}
+  .pill.rout{background:var(--rout);} .pill.fyi{background:var(--fyi);}
+  .chan{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;padding:3px 9px;
+    border:1px solid var(--slate);border-radius:3px;color:var(--slate);text-transform:uppercase;}
+  /* scenario card */
+  .card{border:1px solid var(--line);background:#fff;margin-bottom:20px;border-left:4px solid var(--rout);}
+  .card.crit{border-left-color:var(--crit);} .card.urg{border-left-color:var(--urg);}
+  .card.rout{border-left-color:var(--rout);} .card.fyi{border-left-color:var(--fyi);}
+  .card-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line);}
+  .card-head .num{font-weight:700;font-size:13px;color:var(--ink);}
+  .card-head .who{font-size:13px;color:var(--slate);flex:1 1 auto;min-width:140px;}
+  .card-head .who b{color:var(--ink);}
+  .ctx{font-size:12px;color:var(--slate);padding:9px 20px 0;font-style:italic;}
+  /* chat bubbles */
+  .thread{padding:14px 20px 6px;display:flex;flex-direction:column;gap:9px;}
+  .msg{max-width:78%;padding:9px 13px;border-radius:13px;font-size:13.5px;line-height:1.45;}
+  .msg .nm{display:block;font-size:10.5px;font-weight:700;letter-spacing:.03em;margin-bottom:3px;opacity:.7;}
+  .msg.in{align-self:flex-start;background:var(--bubble-in);color:var(--ink);border-bottom-left-radius:4px;}
+  .msg.me{align-self:flex-end;background:var(--bubble-me);color:#eef4fa;border-bottom-right-radius:4px;}
+  .msg.me .nm{color:#a9c4dd;}
+  .t{font-size:10.5px;color:var(--slate);margin:1px 4px 0;}
+  .t.me{align-self:flex-end;} .t.in{align-self:flex-start;}
+  /* voicemail / call transcript block */
+  .vt{margin:14px 20px 6px;background:#f4f2ec;border:1px solid var(--line);border-radius:6px;padding:14px 16px;}
+  .vt .lbl{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;}
+  .vt p{margin:7px 0;font-size:13.5px;}
+  .vt .spk{font-weight:700;color:var(--ink);}
+  /* triage note */
+  .triage{margin:6px 20px 16px;padding:11px 14px;background:#f0f3f5;border:1px dashed var(--slate);border-radius:5px;
+    font-size:12.5px;color:var(--ink);}
+  .triage b{color:var(--slate);letter-spacing:.04em;text-transform:uppercase;font-size:11px;}
+  /* collision block */
+  .collide{border:2px solid var(--crit);background:#fff;padding:18px 20px;margin:8px 0 6px;}
+  .collide h3{margin:0 0 4px;color:var(--crit);font-size:15px;}
+  .collide .lead{font-size:13.5px;color:var(--ink);margin:0 0 14px;}
+  .stack{display:flex;flex-direction:column;gap:8px;}
+  .arriv{display:flex;gap:12px;align-items:flex-start;padding:9px 12px;border:1px solid var(--line);border-radius:5px;background:#fafaf8;}
+  .arriv .clk{font-variant-numeric:tabular-nums;font-weight:700;font-size:12.5px;color:var(--ink);flex:0 0 46px;}
+  .arriv .txt{font-size:13px;color:var(--ink);flex:1;}
+  h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);font-weight:700;
+    margin:34px 0 16px;padding-bottom:7px;border-bottom:2px solid var(--ink);}
+  footer{padding:16px 40px 26px;font-size:11px;color:var(--slate);border-top:1px solid var(--line);}
+  @media (max-width:620px){
+    .band,.body{padding-left:20px;padding-right:20px;} .legend{grid-template-columns:1fr;}
+    .msg{max-width:88%;}
+  }
+  @media print{body{background:#fff;padding:0;}.sheet{box-shadow:none;border:none;max-width:none;}.card,.collide{break-inside:avoid;}}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="band">
+    <p class="kicker">EP Lab &middot; Communication Tool &middot; Scenario Library v1</p>
+    <h1>On-call communication: synthetic scenarios for triage design</h1>
+    <p>Representative examples of the calls, voicemails, and texts an EP attending fields while on service, spanning roles, channels, and urgency. Built to show engineering what the tool must capture, transcribe, triage, and document.</p>
+    <span class="synthetic">Synthetic &middot; no real patient data</span>
+  </div>
+
+  <div class="body">
+    <p class="intro">Every message below is invented. None comes from real message data. The clinical patterns are authentic to electrophysiology so the examples read true to a working EP, but no patient, colleague, or event is real. Each card is tagged with the sender role, the channel, an urgency tier, and a triage note describing what a good tool should do with it.</p>
+
+    <div class="legend">
+      <div>
+        <h3>Urgency tiers</h3>
+        <div class="row"><span class="pill crit">Critical</span> Interrupt care now. Real-time.</div>
+        <div class="row"><span class="pill urg">Urgent</span> Respond within minutes. Active issue.</div>
+        <div class="row"><span class="pill rout">Routine</span> Within hours. Clinically real, not timed.</div>
+        <div class="row"><span class="pill fyi">FYI</span> No callback. Closes a loop.</div>
+      </div>
+      <div>
+        <h3>Channels</h3>
+        <div class="row"><span class="chan">Text</span> Two-way SMS or iMessage thread.</div>
+        <div class="row"><span class="chan">Voicemail</span> One-way recorded message, transcribed.</div>
+        <div class="row"><span class="chan">Phone</span> Live two-way call, transcribed.</div>
+      </div>
+    </div>
+
+    <h2>CCU nursing</h2>
+
+    <!-- 1 -->
+    <div class="card urg">
+      <div class="card-head"><span class="num">01</span><span class="who"><b>CCU nurse</b> to EP attending</span><span class="chan">Text</span><span class="pill urg">Urgent</span></div>
+      <div class="ctx">Weekday evening, EP on CCU service, seeing a consult on another unit.</div>
+      <div class="thread">
+        <div class="msg in"><span class="nm">CCU nurse</span>Hi Dr. Chan, bed 4 flipped into AF with RVR about 20 minutes ago. Rate 138 to 150, BP holding at 122/74, no chest pain. Rates not settling. Anything you would like?</div>
+        <div class="msg me"><span class="nm">Dr. Chan</span>Thanks. Is she anticoagulated from admission, and any signs of failure, raised JVP or crackles?</div>
+        <div class="msg in"><span class="nm">CCU nurse</span>On apixaban, last dose this morning. Lungs clear, JVP normal, sats 96 percent on room air.</div>
+        <div class="msg me"><span class="nm">Dr. Chan</span>OK. Load amiodarone 150 over 10 minutes then 1 mg/min, recheck rate in 30. If systolic drops below 100 call me straight back. I will come by after this consult.</div>
+        <div class="msg in"><span class="nm">CCU nurse</span>Will do, thank you.</div>
+      </div>
+      <div class="triage"><b>Triage note</b> &nbsp; Stable but active arrhythmia. Needs a timely reply, not an interruption of a procedure. Tool should route to attention within minutes and capture the plan as a documented order trail.</div>
+    </div>
+
+    <!-- 2 -->
+    <div class="card crit">
+      <div class="card-head"><span class="num">02</span><span class="who"><b>CCU nurse</b> to EP attending</span><span class="chan">Text</span><span class="pill crit">Critical</span></div>
+      <div class="ctx">02:10, overnight on call, EP asleep at home.</div>
+      <div class="thread">
+        <div class="msg in"><span class="nm">CCU nurse</span>Dr. Chan, sorry to wake you. Your ICD patient in bed 2 has had 3 shocks in 15 minutes, awake and distressed, looks like recurrent VT on the monitor. What would you like us to do?</div>
+        <div class="msg me"><span class="nm">Dr. Chan</span>That is electrical storm. Put me on speaker at the bedside. Start IV amiodarone bolus, check and replace potassium and magnesium, and call the on-call cardiology fellow to help. Is he still perfusing between episodes?</div>
+        <div class="msg in"><span class="nm">CCU nurse</span>Yes, BP recovers to 110 between episodes, GCS 15.</div>
+        <div class="msg me"><span class="nm">Dr. Chan</span>Good. Add a beta-blocker if the BP tolerates it, keep pads on him. I am coming in now.</div>
+      </div>
+      <div class="triage"><b>Triage note</b> &nbsp; The call that must never be missed. This is the failure mode a missed-call system has to prevent. Tool should mark critical, break through do-not-disturb, and auto-escalate to a backup if unacknowledged in 60 seconds.</div>
+    </div>
+
+    <h2>Outside and referring physicians</h2>
+
+    <!-- 3 -->
+    <div class="card crit">
+      <div class="card-head"><span class="num">03</span><span class="who"><b>Emergency physician</b>, referring site, to EP attending</span><span class="chan">Phone</span><span class="pill crit">Critical</span></div>
+      <div class="ctx">Mid-afternoon, EP at a bedside on the ward.</div>
+      <div class="vt">
+        <div class="lbl">Call transcript</div>
+        <p><span class="spk">ED physician:</span> Dr. Chan, it is the emergency department at the referring site. I have a patient in their sixties with a regular wide-complex tachycardia at 190, looks like VT, BP 84 systolic and borderline. Adenosine did nothing. Awake but clammy. I need EP input now. Do we shock, or do you want procainamide?</p>
+        <p><span class="spk">Dr. Chan:</span> If he is borderline and symptomatic, do not wait on drugs. Sedate and perform a synchronized cardioversion, 150 biphasic. Get the pads on now. I am on my way down, keep this line open.</p>
+        <p><span class="spk">ED physician:</span> Copy, charging now.</p>
+      </div>
+      <div class="triage"><b>Triage note</b> &nbsp; Live decision under time pressure. Interrupt everything. Tool should support a held-open line and one-tap escalation, and log the verbal order for the record.</div>
+    </div>
+
+    <!-- 4 -->
+    <div class="card rout">
+      <div class="card-head"><span class="num">04</span><span class="who"><b>Community cardiologist</b> to EP attending</span><span class="chan">Voicemail</span><span class="pill rout">Routine</span></div>
+      <div class="ctx">Left during a procedure. Heard two hours later.</div>
+      <div class="vt">
+        <div class="lbl">Voicemail transcript</div>
+        <p>Hi William, calling from the community office. I have a patient in her fifties, very symptomatic paroxysmal AF, failed flecainide and sotalol, keen on ablation. Structurally normal heart, I think a good candidate. Wanted to see if you would take the referral and roughly what your wait looks like. Call me back when you get a chance, no rush. Thanks.</p>
+      </div>
+      <div class="triage"><b>Triage note</b> &nbsp; A referral, not a page. Belongs in a queue with the caller number and reason captured, so it never competes with a clinical alert and never needs a live callback to find out it was routine.</div>
+    </div>
+
+    <h2>Nurse practitioner, device clinic</h2>
+
+    <!-- 5 -->
+    <div class="card rout">
+      <div class="card-head"><span class="num">05</span><span class="who"><b>Nurse practitioner</b>, device clinic, to EP attending</span><span class="chan">Text</span><span class="pill rout">Routine</span></div>
+      <div class="ctx">Weekday morning, EP in clinic.</div>
+      <div class="thread">
+        <div class="msg in"><span class="nm">NP</span>Morning Dr. Chan. Remote transmission on one of your pacemaker patients flagged 3 episodes of AT/AF overnight, longest 4 hours, rates well controlled. CHADS score is 3, currently not anticoagulated. Book a call to discuss a DOAC, or bring to next device round?</div>
+        <div class="msg me"><span class="nm">Dr. Chan</span>CHADS 3 with 4 hours documented, yes let us anticoagulate. Send a note to the family doctor to start apixaban 5 twice daily and arrange follow up. Confirm no bleeding history first.</div>
+        <div class="msg in"><span class="nm">NP</span>Will confirm no bleeding contraindication, then send. Thanks.</div>
+      </div>
+      <div class="triage"><b>Triage note</b> &nbsp; Clinically important, not time-critical. Ideal for asynchronous, documented handling. Tool should let this be resolved without a phone call at all, and log the decision to the patient record.</div>
+    </div>
+
+    <h2>Ward nursing</h2>
+
+    <!-- 6 -->
+    <div class="card urg">
+      <div class="card-head"><span class="num">06</span><span class="who"><b>Ward nurse</b> to EP attending</span><span class="chan">Text</span><span class="pill urg">Urgent</span></div>
+      <div class="ctx">Afternoon, EP on ward service, in a family meeting.</div>
+      <div class="thread">
+        <div class="msg in"><span class="nm">Ward nurse</span>Hi Dr. Chan, the patient who had the CRT-D yesterday has swelling over the device pocket, firm and a bit tense, bruising spreading. No external bleeding. He is on aspirin and was bridged. Concerned about a pocket hematoma. Can you take a look?</div>
+        <div class="msg me"><span class="nm">Dr. Chan</span>Hold any further antiplatelet or anticoagulant and do not massage it. Mark the margins with a pen and photograph it. Keep the arm still. I will assess within the hour. Page me if it expands quickly or he becomes unwell.</div>
+        <div class="msg in"><span class="nm">Ward nurse</span>Understood, holding meds and marking now.</div>
+      </div>
+      <div class="triage"><b>Triage note</b> &nbsp; Potential complication needing timely assessment. Tool should deliver clear interim instructions, timestamp them, and hold a photo attachment against the record.</div>
+    </div>
+
+    <!-- 7 -->
+    <div class="card fyi">
+      <div class="card-head"><span class="num">07</span><span class="who"><b>Ward nurse</b> to EP attending</span><span class="chan">Voicemail</span><span class="pill fyi">FYI</span></div>
+      <div class="ctx">Left mid-morning. No response required.</div>
+      <div class="vt">
+        <div class="lbl">Voicemail transcript</div>
+        <p>Hi Dr. Chan, this is the ward calling. Just letting you know your post-ablation patient from this morning is settled and comfortable. Small amount of oozing at the right groin site, we have applied a pressure dressing, distal pulses are fine, no hematoma. Vitals stable. No callback needed, just keeping you in the loop. Thanks.</p>
+      </div>
+      <div class="triage"><b>Triage note</b> &nbsp; Pure status update. The system should recognize a no-callback FYI and keep it out of the active queue, so it never reads as urgent until answered. Every one of these that gets returned is wasted time.</div>
+    </div>
+
+    <h2>OR nursing</h2>
+
+    <!-- 8 -->
+    <div class="card urg">
+      <div class="card-head"><span class="num">08</span><span class="who"><b>OR nurse</b> to EP attending</span><span class="chan">Phone</span><span class="pill urg">Urgent</span></div>
+      <div class="ctx">Between cases, list running behind.</div>
+      <div class="vt">
+        <div class="lbl">Call transcript</div>
+        <p><span class="spk">OR nurse:</span> Dr. Chan, we are turning over room 3. Your next case, the AF ablation, is pre-op ready, but the PFA consumables have not arrived from stores and anesthesia wants to know if you want general or conscious sedation. The mapping rep is not here yet either.</p>
+        <p><span class="spk">Dr. Chan:</span> General for this one. Chase the rep, we cannot start mapping without them. I will come speak to anesthesia in five minutes. Hold the patient in pre-op until the consumables land.</p>
+        <p><span class="spk">OR nurse:</span> Thanks, I will let anesthesia know.</p>
+      </div>
+      <div class="triage"><b>Triage note</b> &nbsp; Operational and time-sensitive to list flow, not a clinical emergency. A distinct category the tool should recognize, since these compete with clinical calls but need different handling.</div>
+    </div>
+
+    <!-- 9 -->
+    <div class="card fyi">
+      <div class="card-head"><span class="num">09</span><span class="who"><b>Nurse practitioner</b> to EP attending</span><span class="chan">Text</span><span class="pill fyi">FYI</span></div>
+      <div class="ctx">End of day.</div>
+      <div class="thread">
+        <div class="msg in"><span class="nm">NP</span>FYI your cardioversion patient from Tuesday is doing well, back in sinus, anticoagulation continued, follow up booked in 4 weeks. Nothing needed from you.</div>
+      </div>
+      <div class="triage"><b>Triage note</b> &nbsp; Loop-closing FYI. Should be acknowledged with one tap and archived, never surfaced as a pending action.</div>
+    </div>
+
+    <h2>The core problem: simultaneous arrival</h2>
+    <div class="collide">
+      <h3>Three messages, four minutes, one phone</h3>
+      <p class="lead">This is the pattern the data showed: in the CCU week, nearly half of all calls landed within five minutes of another. Here is why that matters. Without triage metadata, these three look identical until answered, and answering them in arrival order means the critical one waits behind a status update.</p>
+      <div class="stack">
+        <div class="arriv"><span class="clk">15:02</span><span class="txt"><span class="pill urg">Urgent</span> &nbsp; CCU nurse, text: AF with RVR in bed 4, rates not settling.</span></div>
+        <div class="arriv"><span class="clk">15:03</span><span class="txt"><span class="pill crit">Critical</span> &nbsp; ED physician, call: borderline VT at 190, needs EP input now.</span></div>
+        <div class="arriv"><span class="clk">15:05</span><span class="txt"><span class="pill fyi">FYI</span> &nbsp; Ward nurse, voicemail: post-ablation patient settled, no callback needed.</span></div>
+      </div>
+      <div class="triage" style="margin-left:0;margin-right:0;"><b>What the tool must do</b> &nbsp; Rank by urgency, not arrival. Surface the critical VT first, hold the FYI out of the queue, and let the urgent AF wait its turn with its context attached. The physician stops guessing, and no one has to re-dial to be heard.</div>
+    </div>
+
+  </div>
+  <footer>Synthetic scenario library for the EP communication tool. No real patient, colleague, or message data. Prepared for design discussion with the Management Engineering and University of Waterloo engineering teams. Version 1, for iteration.</footer>
+</div>
+</body>
+</html>

@@ -1,12 +1,11 @@
 # Triage Rubric — Clinical Ground Truth
 
 > **⚠ PROVISIONAL DRAFT — NOT YET CLINICIAN-APPROVED.**
-> The clinical content below was drafted by the team to unblock a prototype
-> generation run. It is **not** a substitute for partner-physician sign-off. §1
-> and §2 must be reviewed and signed by the partner EP attending before
-> generation scales past the first 30 records, and the anchor examples in §2 are
-> **illustrative placeholders** until the source scenario set is added and the
-> real verbatim quotes are inserted.
+> The tier definitions in §1 were drafted by the team to unblock a prototype
+> generation run. They are **not** a substitute for partner-physician sign-off:
+> §1 must be reviewed and signed by the partner EP attending before generation
+> scales past the first 30 records. The §2 anchors are now quoted **verbatim**
+> from the partner scenario set (`data/source/oncall_comm_scenarios.html`).
 
 > **TEAM-WRITTEN DOCUMENT.** Authored and maintained by the team, not generated.
 > It is the clinical ground truth for the whole pipeline and the artifact shown
@@ -54,25 +53,46 @@ note, or confirmation a patient was seen.
 
 ## 2. Anchor examples
 
-> Illustrative placeholders — **replace with verbatim quotes** from
-> `data/source/oncall_comm_scenarios.html`, each citing its scenario number, once
-> the source set is added.
+Verbatim quotes from `data/source/oncall_comm_scenarios.html`, cited by scenario
+number. (Note: the source set tags urgency as Critical / Urgent / Routine / FYI,
+which map onto this rubric's `critical | urgent | routine | fyi` directly.)
 
 ### critical
-- "He's in electrical storm — three shocks in the last hour and still in VT." *(illustrative; cite scenario #)*
-- "BP is 70 systolic, he's obtunded, looks like tamponade post-ablation." *(illustrative; cite scenario #)*
+- **Scenario 02** (CCU nurse, text): "Your ICD patient in bed 2 has had 3 shocks
+  in 15 minutes, awake and distressed, looks like recurrent VT on the monitor."
+  — electrical storm; note the caller apologises for waking the physician (see §6).
+- **Scenario 03** (referring ED physician, phone): "a regular wide-complex
+  tachycardia at 190, looks like VT, BP 84 systolic and borderline. Adenosine did
+  nothing. Awake but clammy. I need EP input now."
 
 ### urgent
-- "AF with RVR at 150, rate control isn't holding, he's uncomfortable." *(illustrative; cite scenario #)*
-- "Single ICD shock, patient feels fine now, interrogation shows an inappropriate detection." *(illustrative; cite scenario #)*
+- **Scenario 01** (CCU nurse, text): "bed 4 flipped into AF with RVR about 20
+  minutes ago. Rate 138 to 150, BP holding at 122/74, no chest pain. Rates not
+  settling." — active arrhythmia, haemodynamically stable.
+- **Scenario 06** (ward nurse, text): "swelling over the device pocket, firm and
+  a bit tense, bruising spreading. No external bleeding … Concerned about a pocket
+  hematoma."
 
 ### routine
-- "Can we clarify the apixaban hold plan before Thursday's ablation?" *(illustrative; cite scenario #)*
-- "Device clinic question about a stable interrogation, no symptoms." *(illustrative; cite scenario #)*
+- **Scenario 04** (community cardiologist, voicemail): "a patient in her fifties,
+  very symptomatic paroxysmal AF, failed flecainide and sotalol, keen on ablation
+  … Wanted to see if you would take the referral … no rush."
+- **Scenario 05** (device-clinic NP, text): "Remote transmission … flagged 3
+  episodes of AT/AF overnight, longest 4 hours, rates well controlled. CHADS score
+  is 3, currently not anticoagulated."
 
 ### fyi
-- "Just closing the loop — the remote transmission was within limits, no action needed." *(illustrative; cite scenario #)*
-- "FYI, the patient was seen and discharged, nothing required from you." *(illustrative; cite scenario #)*
+- **Scenario 07** (ward nurse, voicemail): "your post-ablation patient from this
+  morning is settled and comfortable … No callback needed, just keeping you in the
+  loop." — no-callback FYI (see §3).
+- **Scenario 09** (NP, text): "FYI your cardioversion patient from Tuesday is doing
+  well, back in sinus … Nothing needed from you."
+
+### operational (crosses tiers; see §5)
+- **Scenario 08** (OR nurse, phone): "we are turning over room 3 … the PFA
+  consumables have not arrived from stores and anesthesia wants to know if you want
+  general or conscious sedation." — time-sensitive logistics, not a clinical
+  emergency; tagged Urgent in the source.
 
 ## 2.1 Boundary disambiguation rules
 
