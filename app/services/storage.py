@@ -4,7 +4,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.config import AUDIO_STORAGE_DIR
+from app.config import AUDIO_STORAGE_DIR, DEIDENTIFY_TRANSCRIPTS
 from app.models import Call
 from app.services.classification import classify_transcript
 from app.services.push import dispatch_push_for_call
@@ -35,13 +35,25 @@ def _classify_and_store(
     (process_call_transcript) funnel through here so classification and
     persistence logic exists in exactly one place.
     """
-    classification = classify_transcript(transcript)
+    # Redaction sits BETWEEN transcription and classification (privacy spec P6):
+    # the classifier only ever sees redacted text, so identifiers never cross to
+    # the third-party API. Gated + default off. NOTE: the token map (for
+    # re-identification) belongs in a separate call_identifiers table (P4) and is
+    # reversed by the authorised path (P7) — both follow-on tasks; until then,
+    # enabling this flag de-identifies at the cost of losing re-identification.
+    text_to_classify = transcript
+    if DEIDENTIFY_TRANSCRIPTS:
+        from app.services.deident import redact
+
+        text_to_classify, _token_map = redact(transcript)
+
+    classification = classify_transcript(text_to_classify)
 
     call = Call(
         call_sid=call_sid,
         from_number=from_number,
         audio_path=audio_path,
-        transcript=transcript,
+        transcript=text_to_classify,
         channel=channel,
         urgency=classification["urgency"],
         request_type=classification["request_type"],
