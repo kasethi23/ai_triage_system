@@ -25,54 +25,147 @@ accuracy; see caveats.)
 
 ---
 
-## Key decisions made
+## Design decisions (all of them)
 
-**Classification / labels**
-- **Severity enum renamed** to `critical | urgent | routine | fyi` (was
-  `severe | emergent | semi-urgent | non-urgent`) — matches the partner's vocabulary.
+Grouped by area. Includes the foundational MVP architecture decisions as well as
+everything decided during this build-out, so the reasoning is captured in one place.
+
+### System architecture
+- **Stack:** FastAPI (Python) backend, SQLite datastore, React + TypeScript web
+  console, native SwiftUI iOS app. Chosen for speed of prototyping and because the
+  team already had the MVP in this shape.
+- **Telephony via Twilio** — records the voicemail and posts a webhook. No
+  self-hosted PBX (documented as the production direction).
+- **Transcription via OpenAI Whisper (hosted)** — accepted that audio leaves the
+  machine for the prototype; local Whisper is the recommended production path.
+- **Classification via a hosted LLM (`gpt-5-mini`) with a strict JSON schema** —
+  **no model training.** The classifier is a *frozen prompt*; "training data" here
+  means a labelled test set, not weights. Structured output (not free-form parsing)
+  so the result is always a valid, typed object.
+- **SQLite** as the store (plaintext file — a known at-rest limitation for the
+  prototype). **SSE** pushes new calls to the web console; **APNs** pushes to iOS.
+- **Deployment on Railway** (Procfile, `/data` volume for SQLite + audio).
+- **The product is a three-way decision — interrupt now / hold / log.**
+  Classification exists to serve that decision, not as an end in itself.
+
+### Classifier & labels
+- **Severity is the primary label**, renamed to `critical | urgent | routine | fyi`
+  (was `severe | emergent | semi-urgent | non-urgent`) to match the partner's
+  vocabulary and remove a standing source of labelling error.
 - **`urgency` is derived in Python** from `severity` (single `SEVERITY_TO_URGENCY`
-  map), not asked of the model — the two can never disagree.
+  map), kept only for requirements traceability (FR2) — the model is not asked for
+  it, so the two labels can never disagree.
+- **Severity is judged on required response time and action, not vocabulary or
+  emotional register** (a calm/apologetic caller can still be critical).
 - **`channel`** (text/voicemail/phone) is set from the ingestion path, **not**
   LLM-inferred. **`no_callback`** and **`insufficient_detail`** are LLM-inferred
-  flags. Added **`operational`** request type (OR-logistics calls).
+  flags; on `insufficient_detail` the model **flags rather than guesses** (NFR1).
+  Added the **`operational`** request type for OR-logistics calls.
+- **`confidence` drives an auto-route vs flag-for-review threshold**; `summary` and
+  `suggested_action` are one-liners for the physician.
+- **Two ingestion paths share one classify-and-store tail** (`_classify_and_store`)
+  — `process_call_recording` (Twilio audio) and `process_call_transcript` (text /
+  synthetic), so the live system and the corpus exercise the identical classifier.
+- **Correction loop closes through prompt context (few-shot), not weights.**
+  Physician corrections are stored, then **human-approved** promotion adds them to a
+  runtime few-shot pool; a promoted example is permanently disqualified from the
+  eval test set (leakage guard).
 - **Scope is electrophysiology only** (not broad cardiology) — consistent with the
-  partner's anchors and specialty.
+  partner's anchors, specialty, and the measured metadata.
 
-**Dataset**
-- **Corpus scale: 400 records** (80 critical / 120 urgent / 120 routine / 80 fyi) —
-  critical oversampled ~10× vs its ~2% real prevalence so recall has a usable CI.
-- **Full auto-generation, lean human rating** (40 records, 2 raters).
-- **Grid grounded in the measured call-load data** (285 CCU-week calls, 16:00 peak,
-  49%-within-5-min bursts) rather than estimated.
-- **Rubric is a provisional team draft** (§1 tier definitions) **pending partner-
-  physician sign-off**; §2 anchors are quoted verbatim from the partner scenarios.
-- **Cost matrix values are placeholders** — to be elicited from the clinician (N4).
-- **Generator and classifier are the same model family** (`gpt-5-mini`) → shared
-  blind spots. Stated as a limitation in every eval output.
+### Dataset & evaluation methodology
+- **All data is synthetic — no real PHI** (C1 / NFR2).
+- **Label-first generation:** the label is asserted in the prompt and a consistent
+  message is requested. A model is **never** asked to label its own output.
+- **Full provenance on every record** (`generation_cell`, `seed`) — so failures can
+  be attributed to specific cells, not a single accuracy number.
+- **Generation counts are deliberately distorted from true prevalence** (critical
+  oversampled ~10× to ~20% so recall has a usable CI; boundary tiers heavy). All
+  reported rates are **reweighted against estimated prevalence**.
+- **Corpus scale: 400 records** (80/120/120/80); **full auto-generation, lean human
+  rating** (40 records, 2 raters).
+- **Generation grid** crosses caller_role × request_type × severity × channel ×
+  time_of_day × clinical_topic, **pruning clinically impossible cells** (e.g. an
+  ablation referral is never critical). Grid weights are **grounded in the measured
+  call-load data** (16:00 peak, text-heavy channel mix, 49%-within-5-min bursts),
+  not estimated.
+- **~30% of records are degraded** to resemble real Whisper output — ASR homophone
+  errors, truncation, SBAR-field removal, tone distractors. Degradation **never
+  changes the assigned severity** except truncation, which sets `insufficient_detail`.
+- **Arrival bursts (≥12)** model the real queue (three calls in four minutes where
+  arrival order inverts priority); bursts are assigned **whole** to a split.
+- **Leakage is checked before any eval is trusted:** a bag-of-words baseline must
+  stay under ~85% (or the generator is leaking the label), plus a length-correlation
+  check.
+- **Splits are deterministic and stratified** (fewshot 5% / dev 25% / test 70%) by
+  severity *and* degradation status; the seed is recorded; **the test split is never
+  read by generation/prompt code** (load-time guard).
+- **Multi-rater agreement** via Cohen's/Fleiss' κ; **κ < 0.6 means the rubric is
+  underspecified** → revise and regenerate.
+- **Evaluation is cost-sensitive:** an asymmetric cost matrix (a missed critical far
+  outweighs an unnecessary interrupt); **recall on `critical` is the single headline
+  metric**; a **threshold sweep** justifies the operating point. Cost values are
+  **placeholders pending clinician elicitation (N4)**.
+- **`data/rubric.md` is the single source of truth** for tier definitions; the
+  classifier's schema descriptions mirror it. The rubric is a **provisional team
+  draft pending partner-physician sign-off** (§1); §2 anchors are quoted verbatim
+  from the partner scenarios.
+- **Generator and classifier share a model family** (`gpt-5-mini`) → shared blind
+  spots. Every eval output states this: synthetic results **validate the pipeline
+  and tune the threshold; they do not establish real-world accuracy.**
 
-**Correction loop (Task 12)**
-- The classifier is a frozen LLM prompt, so physician corrections close the loop
-  through **prompt context (few-shot), not model weights**. Promotion into the
-  runtime pool is **human-approved**, never automatic.
+### Privacy & security architecture
+- **Trust-boundary framing (B1–B8):** a system is only as protected as its weakest
+  crossing; controls are placed at the crossings.
+- **B6 (physician console) is where PHI *should* flow** — the physician is inside the
+  circle of care; PHIPA does not ask us to hide data from the treating clinician. The
+  control there is **authenticate / authorise / audit, not concealment.**
+- **De-identification via Microsoft Presidio** (open-source, **local** spaCy model —
+  nothing leaves the machine). **Not an LLM pass** — an LLM redactor would transmit
+  the identifiers off-machine to remove them, defeating the purpose.
+- **Redaction sits between transcription and classification** (`transcribe → redact →
+  classify`) so identifiers never cross to the classifier API. Adding it at storage
+  time would be useless.
+- **Identifiers are split into their own table** (`call_identifiers`); the `calls`
+  row — and any export — is **identifier-free by construction**.
+- **Re-identification is gated and logged** (P7): `GET /calls` is redacted by
+  default; a separate authorised endpoint restores identity and writes an audit row
+  (`call_views`) — the event a PHIPA audit asks about.
+- **Intake = "Option B"**: one **keypad tap for the room number** (DTMF — never
+  becomes audio, and it's exact) + a **single voicemail** + a **★ emergency bypass**.
+  Chosen over a full 3-step structured flow (worse caller UX) and over a plain single
+  voicemail (weaker recall, mangled room). Rationale: keep caller friction low so
+  staff don't route around the tool.
+- **Audio retention:** deleted after transcription (`RETAIN_AUDIO`, default off), and
+  **Twilio's own retained copy is deleted** via REST — voice is biometric and can't
+  be tokenised, so stored audio is the highest-risk artifact.
+- **Auth:** single-user bearer token (P2); **CORS locked** to the frontend origin
+  (P3); **Twilio webhook signature validation** (P1).
+- **All privacy controls are gated behind config flags and default OFF**, so the
+  synthetic-data workflow is unaffected.
+- **Push payloads are minimized** (severity, patient name, room, one-line summary
+  only — never transcripts, caller identity, or phone numbers).
+- **PHIPA reasonableness standard** (Ontario, not HIPAA safe-harbour) — the token
+  categories are HIPAA-informed but this is **not a compliance claim**; sufficiency
+  is WRHN's privacy office and the REB's call.
+- **Started with `en_core_web_sm`** (light); `en_core_web_lg`/transformer noted for
+  production. **Local Whisper is the recommended production path** (closes the
+  audio→OpenAI gap) — documented, deferred.
+- **Physician's real name never enters generated data** — a placeholder is used and
+  `generate_calls.py` asserts against a forbidden-name list (P10).
 
-**Privacy**
+### Process & engineering
 - **Task 13 (old de-identification) was removed** from the dataset spec and
   **superseded by the privacy architecture spec**.
-- **Reconcile the iOS branch first, then do privacy** — avoids reconciling the
+- **Reconcile the iOS branch *before* the privacy spec** — the two branches touched
+  the same backend files; doing privacy first would have forced reconciling the
   backend twice.
-- **Microsoft Presidio** for de-identification (open-source, runs locally — nothing
-  leaves the machine; not an LLM pass).
-- **Intake = "Option B"**: one **keypad tap for the room number** + a **single
-  voicemail** + a **★ emergency bypass** (rather than a full 3-step structured
-  flow, or a single voicemail with no structure). Keeps the caller experience close
-  to a normal voicemail while getting the room out of the audio and exact.
-- **All privacy controls are gated behind config flags and default OFF** so the
-  synthetic-data workflow is unaffected.
-- Started with the light spaCy model `en_core_web_sm`; `en_core_web_lg` noted for
-  production.
-
-**Ops**
-- The merged backend now **requires Python 3.10+** (from the iOS branch).
+- **The merged backend requires Python 3.10+** (the iOS branch uses PEP 604 unions
+  and `aioapns`).
+- **Migration convention:** every new column/table goes in BOTH `app/models.py` AND
+  `app/database.py::_migrate_sqlite_columns`.
+- **Regenerated corpus data is gitignored** — committed only after a reviewed real
+  generation run, so fake data never masquerades as real.
 
 ---
 
