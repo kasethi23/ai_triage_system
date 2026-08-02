@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>On-Call Communication Load: Scoping Brief</title>
+<style>
+  :root{
+    --ink:#132a43;
+    --ink-soft:#3d556e;
+    --slate:#5a6b7d;
+    --paper:#f7f6f2;
+    --line:#d9d5cc;
+    --signal:#b4232a;
+    --signal-soft:#e7c9ca;
+    --steel:#2f6d8c;
+    --steel-soft:#cfe0e7;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    background:#e9e7e0;
+    color:var(--ink);
+    font-family:"Helvetica Neue",Arial,"Segoe UI",system-ui,sans-serif;
+    line-height:1.5;
+    padding:32px 16px;
+  }
+  .sheet{
+    max-width:840px;margin:0 auto;background:var(--paper);
+    border:1px solid var(--line);
+    box-shadow:0 1px 0 rgba(0,0,0,.04),0 18px 40px -28px rgba(19,42,67,.55);
+  }
+  .band{background:var(--ink);color:#f4f2ec;padding:26px 40px 22px;}
+  .kicker{
+    font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:#9fb4c6;margin:0 0 10px;font-weight:600;
+  }
+  h1{font-size:26px;line-height:1.18;margin:0;font-weight:700;letter-spacing:-.01em;}
+  .band p{margin:10px 0 0;color:#c6d2dd;font-size:13.5px;max-width:62ch;}
+  .body{padding:30px 40px 38px;}
+  .lede{font-size:16px;color:var(--ink);margin:0 0 26px;}
+  .lede b{color:var(--signal);}
+  h2{
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--slate);font-weight:700;margin:34px 0 14px;
+    padding-bottom:7px;border-bottom:2px solid var(--ink);
+  }
+  /* headline stats */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);}
+  .stat{background:var(--paper);padding:16px 14px;}
+  .stat .n{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1;}
+  .stat .n.sig{color:var(--signal);}
+  .stat .l{font-size:11.5px;color:var(--slate);margin-top:8px;line-height:1.35;}
+  /* chart */
+  .chart-wrap{border:1px solid var(--line);background:#fff;padding:20px 22px 14px;}
+  .chart-title{font-size:13px;font-weight:700;color:var(--ink);margin:0 0 4px;}
+  .chart-sub{font-size:12px;color:var(--slate);margin:0 0 16px;}
+  svg{display:block;width:100%;height:auto;}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;color:var(--slate);}
+  .swatch{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px;}
+  /* readout list */
+  .read{margin:0;padding:0;list-style:none;}
+  .read li{padding:11px 0;border-bottom:1px solid var(--line);display:flex;gap:14px;font-size:14px;}
+  .read li:last-child{border-bottom:none;}
+  .read .tag{flex:0 0 132px;font-weight:700;color:var(--steel);font-size:12.5px;letter-spacing:.02em;padding-top:1px;}
+  .read .txt{color:var(--ink);}
+  .read .txt b{color:var(--signal);}
+  /* scope box */
+  .scope{background:#eef1ee;border:1px solid var(--line);border-left:3px solid var(--steel);padding:16px 20px;font-size:12.5px;color:var(--slate);margin-top:8px;}
+  .scope b{color:var(--ink);}
+  .scope ul{margin:8px 0 0;padding-left:18px;}
+  .scope li{margin:5px 0;}
+  footer{padding:16px 40px 26px;font-size:11px;color:var(--slate);border-top:1px solid var(--line);}
+  @media (max-width:620px){
+    .stats{grid-template-columns:repeat(2,1fr);}
+    .band,.body{padding-left:22px;padding-right:22px;}
+    .read li{flex-direction:column;gap:2px;}
+    .read .tag{flex-basis:auto;}
+  }
+  @media print{
+    body{background:#fff;padding:0;}
+    .sheet{box-shadow:none;border:none;max-width:none;}
+    .chart-wrap,.stats{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="band">
+    <p class="kicker">EP Lab &middot; Communication Tool &middot; Problem Scoping</p>
+    <h1>On-call call volume when a physician is on service</h1>
+    <p>A metadata-only look at inbound and outbound telephone load during CCU and ward (board) service weeks, prepared to size the problem for the proposed call tracking and triage tool. No message content, no patient information.</p>
+  </div>
+
+  <div class="body">
+    <p class="lede">During a CCU service week an EP attending fielded <b>285 calls in seven days</b>, five times the non-service baseline, and <b>missed roughly 4 in 10 incoming calls</b>, most while already engaged in patient care or fielding an overlapping call. This is the gap the communication tool is meant to close.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="n">41</div><div class="l">calls per day on a CCU week, vs 8 on a normal day</div></div>
+      <div class="stat"><div class="n sig">40%</div><div class="l">of incoming calls missed during the CCU week</div></div>
+      <div class="stat"><div class="n">66</div><div class="l">calls on the single busiest day (May 30)</div></div>
+      <div class="stat"><div class="n">12.2</div><div class="l">hours on the phone across the CCU week</div></div>
+    </div>
+
+    <h2>Daily call load by coverage type</h2>
+    <div class="chart-wrap">
+      <p class="chart-title">Calls per day</p>
+      <p class="chart-sub">Complete-data window, March 1 to July 6, 2026. One CCU week and one ward week captured.</p>
+      <svg viewBox="0 0 640 250" role="img" aria-label="Bar chart of calls per day: baseline 8, ward week 19, CCU week 41">
+        <!-- gridlines -->
+        <g stroke="#e3e0d8" stroke-width="1">
+          <line x1="120" y1="30" x2="620" y2="30"/>
+          <line x1="120" y1="80" x2="620" y2="80"/>
+          <line x1="120" y1="130" x2="620" y2="130"/>
+          <line x1="120" y1="180" x2="620" y2="180"/>
+          <line x1="120" y1="200" x2="620" y2="200"/>
+        </g>
+        <g font-size="11" fill="#5a6b7d" font-family="Arial,sans-serif" text-anchor="end">
+          <text x="112" y="204">0</text>
+          <text x="112" y="184">10</text>
+          <text x="112" y="134">20</text>
+          <text x="112" y="84">30</text>
+          <text x="112" y="34">40</text>
+        </g>
+        <!-- bars: scale 4px per call, baseline y=200 -->
+        <!-- baseline 8 -> 32px -->
+        <rect x="150" y="168" width="90" height="32" fill="#2f6d8c"/>
+        <text x="195" y="160" text-anchor="middle" font-size="13" font-weight="700" fill="#132a43" font-family="Arial,sans-serif">8.0</text>
+        <text x="195" y="222" text-anchor="middle" font-size="12" fill="#5a6b7d" font-family="Arial,sans-serif">Normal day</text>
+        <!-- ward 19 -> 76px -->
+        <rect x="300" y="124" width="90" height="76" fill="#2f6d8c"/>
+        <text x="345" y="116" text-anchor="middle" font-size="13" font-weight="700" fill="#132a43" font-family="Arial,sans-serif">19.0</text>
+        <text x="345" y="222" text-anchor="middle" font-size="12" fill="#5a6b7d" font-family="Arial,sans-serif">Ward week</text>
+        <!-- ccu 40.7 -> 163px -->
+        <rect x="450" y="37" width="90" height="163" fill="#b4232a"/>
+        <text x="495" y="29" text-anchor="middle" font-size="13" font-weight="700" fill="#b4232a" font-family="Arial,sans-serif">40.7</text>
+        <text x="495" y="222" text-anchor="middle" font-size="12" fill="#5a6b7d" font-family="Arial,sans-serif">CCU week</text>
+      </svg>
+    </div>
+
+    <h2>When the calls arrive: CCU week by hour</h2>
+    <div class="chart-wrap">
+      <p class="chart-title">Interruption profile across the CCU week</p>
+      <p class="chart-sub">285 calls over 7 days. The load is overwhelmingly daytime, peaking through the afternoon, with a smaller overnight tail.</p>
+      <svg viewBox="0 0 640 210" role="img" aria-label="Hourly distribution of CCU-week calls, peaking mid-afternoon">
+        <g stroke="#e3e0d8" stroke-width="1">
+          <line x1="40" y1="20" x2="628" y2="20"/>
+          <line x1="40" y1="70" x2="628" y2="70"/>
+          <line x1="40" y1="120" x2="628" y2="120"/>
+          <line x1="40" y1="170" x2="628" y2="170"/>
+        </g>
+        <g font-size="10" fill="#5a6b7d" font-family="Arial,sans-serif" text-anchor="end">
+          <text x="34" y="173">0</text>
+          <text x="34" y="123">15</text>
+          <text x="34" y="73">30</text>
+          <text x="34" y="23">45</text>
+        </g>
+        <!-- 24 bars, x from 48, width 20, gap 4.5, scale ~3.33px/call (45 -> 150) baseline y=170 -->
+        <g fill="#2f6d8c">
+          <rect x="48"  y="160" width="20" height="10"/>
+          <rect x="72.5" y="170" width="20" height="0"/>
+          <rect x="97"  y="167" width="20" height="3"/>
+          <rect x="121.5" y="160" width="20" height="10"/>
+          <rect x="146"  y="170" width="20" height="0"/>
+          <rect x="170.5" y="170" width="20" height="0"/>
+          <rect x="195"  y="160" width="20" height="10"/>
+          <rect x="219.5" y="143" width="20" height="27"/>
+          <rect x="244"  y="103" width="20" height="67"/>
+          <rect x="268.5" y="80" width="20" height="90"/>
+          <rect x="293"  y="107" width="20" height="63"/>
+          <rect x="317.5" y="107" width="20" height="63"/>
+          <rect x="342"  y="123" width="20" height="47"/>
+          <rect x="366.5" y="77" width="20" height="93"/>
+          <rect x="391"  y="87" width="20" height="83"/>
+          <rect x="415.5" y="67" width="20" height="103"/>
+        </g>
+        <!-- peak hour 16:00 = 42 in signal red -->
+        <rect x="440" y="30" width="20" height="140" fill="#b4232a"/>
+        <g fill="#2f6d8c">
+          <rect x="464.5" y="113" width="20" height="57"/>
+          <rect x="489"  y="157" width="20" height="13"/>
+          <rect x="513.5" y="137" width="20" height="33"/>
+          <rect x="538"  y="150" width="20" height="20"/>
+          <rect x="562.5" y="157" width="20" height="13"/>
+          <rect x="587"  y="170" width="20" height="0"/>
+          <rect x="611.5" y="167" width="20" height="3"/>
+        </g>
+        <g font-size="9.5" fill="#5a6b7d" font-family="Arial,sans-serif" text-anchor="middle">
+          <text x="58" y="185">00</text>
+          <text x="205" y="185">06</text>
+          <text x="352" y="185">12</text>
+          <text x="450" y="197" font-size="10" font-weight="700" fill="#b4232a">16:00 peak &middot; 42</text>
+          <text x="499" y="185">18</text>
+          <text x="621" y="185">23</text>
+        </g>
+      </svg>
+    </div>
+
+    <h2>Calls collide: why a missed call is usually physics, not choice</h2>
+    <div class="stats">
+      <div class="stat"><div class="n sig">49%</div><div class="l">of CCU-week calls arrived within 5 minutes of another call</div></div>
+      <div class="stat"><div class="n">15</div><div class="l">calls in the single busiest hour</div></div>
+      <div class="stat"><div class="n sig">58%</div><div class="l">of missed calls landed during a pile-up, with another call inside 5 minutes</div></div>
+      <div class="stat"><div class="n">21</div><div class="l">bursts of 3 or more calls back to back in the CCU week</div></div>
+    </div>
+    <p style="font-size:14px;color:#132a43;margin:16px 0 0;">A single phone cannot take two lines at once. In the CCU week nearly half of all calls stacked on top of another, and most unanswered calls occurred inside one of those clusters. The rest were deferred for a rational reason: while seeing a patient or at the bedside, breaking off a clinical conversation to take an untriaged call is disruptive, and with no way to judge urgency in advance, the call was tabled. This is the core argument for the tool. Automated intake that logs, timestamps, and ranks urgency turns a returned call from a guess into a decision.</p>
+
+    <h2>Missed calls do not resolve, they recirculate</h2>
+    <div class="stats">
+      <div class="stat"><div class="n sig">48%</div><div class="l">of missed CCU-week calls, the caller re-dialed within the hour</div></div>
+      <div class="stat"><div class="n">19%</div><div class="l">of missed calls the physician returned the same day</div></div>
+      <div class="stat"><div class="n">14%</div><div class="l">returned within 60 minutes, the realistic callback window</div></div>
+      <div class="stat"><div class="n sig">38</div><div class="l">re-calls in the CCU week, counted inside the 285 total</div></div>
+    </div>
+    <p style="font-size:14px;color:#132a43;margin:16px 0 0;">A missed call rarely closed with a tidy callback. Returning a call needs a free moment the physician did not have, so only about 1 in 5 were returned the same day. Instead nearly half the callers simply rang again within the hour. That re-call churn is not separate from the volume problem, it is part of it: those repeat calls sit inside the 285 total and feed straight back into the collisions above. A logged and triaged queue absorbs both sides. Callers stop re-dialing because their request is captured and ranked, and the physician stops guessing who to call back first.</p>
+
+    <h2>Total time on communication: calls and texts together</h2>
+    <div class="stats">
+      <div class="stat"><div class="n sig">~22 h</div><div class="l">estimated communication time in the CCU week, calls plus texts</div></div>
+      <div class="stat"><div class="n">3.1 h</div><div class="l">estimated per day on a CCU week, vs 1.3 h off service</div></div>
+      <div class="stat"><div class="n">12.2 h</div><div class="l">measured time connected on calls in the CCU week</div></div>
+      <div class="stat"><div class="n">110</div><div class="l">texts per day during service, vs 60 off service</div></div>
+    </div>
+    <p style="font-size:14px;color:#132a43;margin:16px 0 0;">Calls are only half the channel. Text traffic ran near 110 messages a day on service, almost double the baseline of 60, split evenly between sent and received, which is the signature of two-way coordination rather than broadcast. Connected calls are measured directly at 12.2 hours for the CCU week. Adding texts at a conservative 45 seconds of attention each brings estimated communication time to roughly 22 hours across the week, about 3 hours every day on top of clinical work. The text portion is an estimate; the call time is measured.</p>
+
+    <h2>What the data shows</h2>
+    <ul class="read">
+      <li><span class="tag">Volume</span><span class="txt">Service coverage multiplies telephone load. A ward week ran at 19 calls per day and a CCU week at 41, against a baseline near 8. The CCU week alone was <b>285 calls</b>.</span></li>
+      <li><span class="tag">Missed calls</span><span class="txt">Of 196 incoming calls in the CCU week, <b>78 went unanswered (40%)</b>. The ward week missed 24%. Calls were not declined casually. They arrived while the physician was seeing patients, at the bedside, already on another line, or could not be judged for urgency and so were deferred.</span></li>
+      <li><span class="tag">CCU line</span><span class="txt">The CCU telephone accounted for 34 calls in the CCU week and 12 in the ward week. It is a primary channel, and it is invisible in text or paging records.</span></li>
+      <li><span class="tag">Time cost</span><span class="txt">Connected calls consumed <b>12.2 hours</b> in the CCU week and 6.1 in the ward week, on top of direct patient care.</span></li>
+      <li><span class="tag">Text load</span><span class="txt">Text messaging rose alongside calls, from 60 a day off service to about 110 a day on service, evenly sent and received. Unlike the truncated call history, the text record is complete throughout.</span></li>
+      <li><span class="tag">Timing</span><span class="txt">Load is concentrated in daytime hours, peaking mid-afternoon, with a lighter overnight tail (11 overnight calls in the CCU week, 20 in the ward week).</span></li>
+    </ul>
+
+    <h2>Scope and data provenance</h2>
+    <div class="scope">
+      <b>Source.</b> Telephone call metadata from a single physician device: direction, answered or missed status, duration, counterparty number, and timestamp. No audio, no voicemail, no message content, no patient identifiers. Service weeks were mapped from the 2026 physician assignment schedule.
+      <ul>
+        <li><b>Complete-data window is March 1 to July 6, 2026.</b> Earlier call history was truncated by the device and is not reliable, so it is excluded. The text record is complete throughout.</li>
+        <li>This captures one CCU week and one ward week. The signal is strong and consistent, but wider sampling across more service weeks will firm up the averages, and re-running the same extraction as new weeks accrue will do exactly that.</li>
+        <li>Voice calls only for the call figures. Numeric paging is not captured and would add to the totals.</li>
+        <li>Call talk-time is measured. Text handling time is an estimate at roughly 45 seconds per message, and text counts include some personal traffic, so the combined communication-time figure is indicative rather than exact.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>Prepared for EP lab communication tool scoping with the Management Engineering team. De-identified metadata analysis. Figures reflect the March to July 2026 complete-data window.</footer>
+</div>
+</body>
+</html>

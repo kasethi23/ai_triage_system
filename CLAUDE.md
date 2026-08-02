@@ -75,6 +75,17 @@ Order: `generate_calls.py` → `degrade.py` → `check_leakage.py` → `make_spl
   results validate the pipeline and tune the threshold; they do not establish
   real-world accuracy. Keep that caveat in any output summary.
 
+## Correction feedback loop (Task 12)
+
+The classifier is a frozen LLM prompt — no weights to retrain — so physician
+corrections close the loop through **prompt context**. `PATCH /calls/{id}/correct`
+writes a `corrections` row (and applies the override). `scripts/promote_corrections.py`
+promotes selected corrections into `data/runtime_fewshot.jsonl` — a deliberate,
+human-approved step. `classify_transcript` prepends up to `FEWSHOT_MAX_EXAMPLES`
+of those as worked examples, unless `RUNTIME_FEWSHOT_ENABLED=false`. Any promoted
+transcript is disqualified from the eval test set (evaluate.py hash guard);
+`evaluate.py --no-runtime-fewshot` measures the effect of accumulated corrections.
+
 ## Commands
 
 ```bash
@@ -106,9 +117,6 @@ python scripts/evaluate.py --mock                    # offline metrics smoke tes
 
 ## Not yet implemented (remaining spec work)
 
-- **Task 12 / Amendment F** — correction feedback loop (`corrections` table,
-  `promote_corrections.py`, few-shot injection). evaluate.py's leakage guard is
-  already wired for it.
 - **Privacy architecture** — de-identification, auth, CORS, Twilio signature
   validation, audio retention, and view logging. This supersedes and replaces the
   old dataset-spec Task 13 / Amendment G, which is removed. See

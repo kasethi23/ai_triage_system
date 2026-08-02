@@ -25,7 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from corpus_utils import RAW_PATH, SPLITS_DIR, read_jsonl, write_jsonl  # noqa: E402
+from corpus_utils import RAW_PATH, SPLITS_DIR, read_jsonl, transcript_hash, write_jsonl  # noqa: E402
 
 FRACTIONS = {"fewshot": 0.05, "dev": 0.25, "test": 0.70}
 DEFAULT_SEED = 4242
@@ -56,26 +56,55 @@ def main() -> None:
     records = read_jsonl(args.inp)
     assigned: dict[str, str] = {}  # record id -> split
 
-    # 1) Bursts: assign each whole burst to dev or test (never fewshot).
-    bursts: dict[str, list[dict]] = defaultdict(list)
-    singles: list[dict] = []
-    for r in records:
-        (bursts[r["burst_id"]].append(r) if r.get("burst_id") else singles.append(r))
+    # Group records that must NOT be split apart: members of the same arrival
+    # burst, and any records that share an identical transcript (degraded
+    # fragments can collide). Union-find over both keys, so an identical
+    # transcript never lands in two splits (which would trip the eval leakage
+    # guard) and no burst is divided.
+    parent: dict[str, str] = {r["id"]: r["id"] for r in records}
 
-    burst_ids = sorted(bursts)
-    rng.shuffle(burst_ids)
+    def find(x: str) -> str:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: str, b: str) -> None:
+        parent[find(a)] = find(b)
+
+    first_seen: dict[tuple, str] = {}
+    for r in records:
+        keys = [("hash", transcript_hash(r["transcript"]))]
+        if r.get("burst_id"):
+            keys.append(("burst", r["burst_id"]))
+        for k in keys:
+            if k in first_seen:
+                union(r["id"], first_seen[k])
+            else:
+                first_seen[k] = r["id"]
+
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for r in records:
+        groups[find(r["id"])].append(r)
+
+    # 1) Multi-record groups (bursts and/or duplicate transcripts): assign each
+    #    whole group to dev or test (never fewshot).
+    multi = [g for g in groups.values() if len(g) > 1]
+    singles = [g[0] for g in groups.values() if len(g) == 1]
+
+    rng.shuffle(multi)
     dev_test = {"dev": FRACTIONS["dev"], "test": FRACTIONS["test"]}
     tot = sum(dev_test.values())
     dev_test = {k: v / tot for k, v in dev_test.items()}
-    burst_alloc = _largest_remainder(len(burst_ids), dev_test)
+    multi_alloc = _largest_remainder(len(multi), dev_test)
     idx = 0
-    for split, count in burst_alloc.items():
+    for split, count in multi_alloc.items():
         for _ in range(count):
-            for r in bursts[burst_ids[idx]]:
+            for r in multi[idx]:
                 assigned[r["id"]] = split
             idx += 1
 
-    # 2) Singles: stratify by (severity, degraded) and split each stratum.
+    # 2) Single-record groups: stratify by (severity, degraded) and split.
     strata: dict[tuple, list[dict]] = defaultdict(list)
     for r in singles:
         strata[(r["assigned_severity"], _degraded(r))].append(r)
@@ -105,7 +134,8 @@ def main() -> None:
         "fractions": FRACTIONS,
         "counts": {s: len(rows) for s, rows in out.items()},
         "total": len(records),
-        "bursts_total": len(burst_ids),
+        "bursts_total": len({r["burst_id"] for r in records if r.get("burst_id")}),
+        "grouped_units_kept_whole": len(multi),
         "degraded_per_split": {
             s: sum(1 for r in rows if _degraded(r)) for s, rows in out.items()
         },

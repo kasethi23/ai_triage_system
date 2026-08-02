@@ -1,12 +1,19 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel
 
 from app.database import SessionLocal
 from app.models import Call
+from app.services.corrections import record_correction
 from app.services.storage import call_to_dict
 from app.sse import broker
 
 router = APIRouter(tags=["calls"])
+
+
+class CorrectionIn(BaseModel):
+    corrected_field: str = "severity"
+    corrected_label: str
 
 
 @router.get("/calls")
@@ -58,6 +65,28 @@ def resolve_call(call_id: int) -> dict:
         call.resolved = True
         db.commit()
         db.refresh(call)
+        return call_to_dict(call)
+    finally:
+        db.close()
+
+
+@router.patch("/calls/{call_id}/correct")
+def correct_call(call_id: int, body: CorrectionIn) -> dict:
+    """Record a physician override of a classification (Task 12).
+
+    Persists a Correction row and applies the override to the call. The
+    correction becomes a *candidate* for the runtime few-shot pool; promotion is
+    a separate, human-approved step (scripts/promote_corrections.py).
+    """
+    db = SessionLocal()
+    try:
+        call = db.get(Call, call_id)
+        if call is None:
+            raise HTTPException(status_code=404, detail="Call not found")
+        try:
+            record_correction(db, call, body.corrected_field, body.corrected_label)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
         return call_to_dict(call)
     finally:
         db.close()

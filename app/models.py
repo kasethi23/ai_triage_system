@@ -39,3 +39,28 @@ class Call(Base):
     caller_name: Mapped[str] = mapped_column(String, default="")
     caller_role: Mapped[str] = mapped_column(String, default="")
     resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Correction(Base):
+    """A physician override of a model classification (Task 12 — correction loop).
+
+    The classifier is a frozen LLM prompt, so there is no model to retrain: the
+    loop closes through PROMPT CONTEXT, not weights. Corrections are *candidates*
+    for few-shot inclusion, never automatically used. scripts/promote_corrections.py
+    promotes selected rows into the runtime few-shot pool
+    (data/runtime_fewshot.jsonl); promotion is a deliberate, human-approved step,
+    since a single physician error would otherwise propagate into every subsequent
+    classification.
+    """
+
+    __tablename__ = "corrections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    call_id: Mapped[int] = mapped_column(Integer, index=True)
+    transcript: Mapped[str] = mapped_column(Text, default="")
+    corrected_field: Mapped[str] = mapped_column(String, default="severity")
+    model_label: Mapped[str] = mapped_column(String, default="")
+    corrected_label: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )

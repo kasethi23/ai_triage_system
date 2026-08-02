@@ -1,0 +1,264 @@
+<title>Conduit — Classifier Evaluation (design review)</title>
+<style>
+  :root{
+    --bg:#e9e7e0; --paper:#f7f6f2; --card:#ffffff; --band:#132a43;
+    --ink:#132a43; --slate:#5a6b7d; --faint:#8a8f96; --line:#ddd8ce;
+    --crit:#b4232a; --urg:#bd7b18; --rout:#2f6d8c; --fyi:#8a8f96; --good:#1d7a5f;
+    --band-ink:#f4f2ec; --band-sub:#c6d2dd; --band-kick:#9fb4c6;
+    --warn-bg:#fbf0dc; --warn-ink:#8a5a12; --warn-line:#e6c88a;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0d141c; --paper:#131c26; --card:#17212c; --band:#0e2036;
+      --ink:#e7eef5; --slate:#a2b4c6; --faint:#7d8794; --line:#283644;
+      --band-ink:#eef4fa; --band-sub:#a9c1d6; --band-kick:#7fa0bd;
+      --warn-bg:#2a2314; --warn-ink:#e7c98a; --warn-line:#5a4a26;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#e9e7e0; --paper:#f7f6f2; --card:#ffffff; --band:#132a43;
+    --ink:#132a43; --slate:#5a6b7d; --faint:#8a8f96; --line:#ddd8ce;
+    --band-ink:#f4f2ec; --band-sub:#c6d2dd; --band-kick:#9fb4c6;
+    --warn-bg:#fbf0dc; --warn-ink:#8a5a12; --warn-line:#e6c88a;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d141c; --paper:#131c26; --card:#17212c; --band:#0e2036;
+    --ink:#e7eef5; --slate:#a2b4c6; --faint:#7d8794; --line:#283644;
+    --band-ink:#eef4fa; --band-sub:#a9c1d6; --band-kick:#7fa0bd;
+    --warn-bg:#2a2314; --warn-ink:#e7c98a; --warn-line:#5a4a26;
+  }
+  *{box-sizing:border-box;}
+  .wrap{
+    font-family:"Helvetica Neue",-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    color:var(--ink); background:var(--paper); line-height:1.5;
+    max-width:960px; margin:0 auto; border:1px solid var(--line);
+    font-variant-numeric:tabular-nums;
+  }
+  .band{background:var(--band); color:var(--band-ink); padding:26px 34px 24px;}
+  .kick{font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--band-kick); font-weight:600; margin:0 0 9px;}
+  .band h1{font-size:25px; line-height:1.15; margin:0; font-weight:700; letter-spacing:-.01em; text-wrap:balance;}
+  .band p{margin:9px 0 0; color:var(--band-sub); font-size:13px; max-width:64ch;}
+  .badge{display:inline-block; margin-top:14px; background:#8a3a1e; color:#ffe9dd;
+    font-size:10.5px; font-weight:700; letter-spacing:.07em; padding:5px 11px; border-radius:3px; text-transform:uppercase;}
+  .body{padding:26px 34px 32px; display:flex; flex-direction:column; gap:26px;}
+  h2{font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--slate);
+     font-weight:700; margin:0 0 13px; padding-bottom:6px; border-bottom:2px solid var(--ink);}
+  /* headline tiles */
+  .tiles{display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line);}
+  .tile{background:var(--card); padding:16px 16px 15px;}
+  .tile .lab{font-size:11px; color:var(--slate); font-weight:600; letter-spacing:.02em;}
+  .tile .n{font-weight:700; letter-spacing:-.02em; line-height:1; margin-top:9px;}
+  .tile .n.hero{font-size:46px; color:var(--crit);}
+  .tile .n.mid{font-size:30px;}
+  .tile .sub{font-size:11px; color:var(--faint); margin-top:7px;}
+  .tile .n.good{color:var(--good);}
+  /* two-col */
+  .cols{display:grid; grid-template-columns:1.15fr 1fr; gap:26px;}
+  @media (max-width:720px){.cols{grid-template-columns:1fr;} .tiles{grid-template-columns:1fr 1fr;}}
+  /* confusion matrix */
+  table.cm{border-collapse:collapse; width:100%; font-size:13px;}
+  table.cm caption{caption-side:bottom; font-size:11px; color:var(--faint); text-align:left; padding-top:8px;}
+  table.cm th{font-weight:600; color:var(--slate); font-size:11px; padding:5px 6px; text-align:center;}
+  table.cm th.rowlab{text-align:right; padding-right:9px; white-space:nowrap;}
+  table.cm td{text-align:center; padding:0; border:1px solid var(--line);}
+  .cell{padding:11px 6px; font-weight:700; font-variant-numeric:tabular-nums;}
+  .corner{color:var(--faint); font-size:10px; font-weight:600; text-align:right; padding-right:9px;}
+  .sev-dot{display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; vertical-align:0;}
+  /* findings */
+  ul.find{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:11px;}
+  ul.find li{font-size:13.5px; padding-left:15px; position:relative; color:var(--ink);}
+  ul.find li::before{content:""; position:absolute; left:0; top:7px; width:6px; height:6px; border-radius:50%; background:var(--rout);}
+  ul.find li.warnmark::before{background:var(--crit);}
+  ul.find li.goodmark::before{background:var(--good);}
+  ul.find b{font-weight:700;}
+  /* bars */
+  .bars{display:flex; flex-direction:column; gap:9px;}
+  .barrow{display:grid; grid-template-columns:150px 1fr 60px; align-items:center; gap:10px; font-size:12.5px;}
+  .barrow .bl{color:var(--slate);}
+  .track{height:15px; background:color-mix(in srgb, var(--line) 60%, transparent); border-radius:2px; overflow:hidden;}
+  .fill{height:100%;}
+  .barrow .bv{text-align:right; font-weight:700; font-size:12px;}
+  .split2{display:grid; grid-template-columns:1fr 1fr; gap:26px;}
+  @media (max-width:720px){.split2{grid-template-columns:1fr;}}
+  /* threshold chart */
+  .chart{background:var(--card); border:1px solid var(--line); padding:16px 18px 12px;}
+  .legend{display:flex; gap:18px; font-size:11.5px; color:var(--slate); margin-top:8px;}
+  .swatch{display:inline-block; width:16px; height:3px; margin-right:6px; vertical-align:3px; border-radius:2px;}
+  /* warn callout */
+  .warn{background:var(--warn-bg); border:1px solid var(--warn-line); border-left:3px solid var(--urg);
+    padding:13px 16px; font-size:12.5px; color:var(--warn-ink); border-radius:4px;}
+  .warn b{color:var(--warn-ink);}
+  .limit{background:color-mix(in srgb, var(--crit) 8%, var(--card)); border:1px solid color-mix(in srgb,var(--crit) 25%, var(--line));
+    border-left:3px solid var(--crit); padding:14px 18px; border-radius:4px; font-size:13px;}
+  .limit .lh{font-weight:700; color:var(--crit); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:5px;}
+  footer{padding:16px 34px 24px; border-top:1px solid var(--line); color:var(--faint); font-size:11px; background:var(--card);}
+  footer b{color:var(--slate);}
+  .prov{display:flex; flex-wrap:wrap; gap:6px 18px; margin-bottom:8px;}
+  .prov span b{color:var(--ink);}
+</style>
+
+<div class="wrap">
+  <div class="band">
+    <p class="kick">Conduit &middot; EP call triage &middot; classifier evaluation</p>
+    <h1>How well does the triage classifier rank an on-call queue?</h1>
+    <p>Measured on a held-out set of 280 synthetic electrophysiology messages, using the frozen gpt-5-mini classifier. Prepared for the design review.</p>
+    <span class="badge">Synthetic data &middot; validates pipeline, not real-world accuracy</span>
+  </div>
+
+  <div class="body">
+
+    <div class="tiles">
+      <div class="tile">
+        <div class="lab">Recall on <b>critical</b> — the headline</div>
+        <div class="n hero">91.1%</div>
+        <div class="sub">51 of 56 critical calls caught &middot; ~&plusmn;7% CI</div>
+      </div>
+      <div class="tile">
+        <div class="lab">Overall accuracy</div>
+        <div class="n mid">75.0%</div>
+        <div class="sub">4-tier exact match</div>
+      </div>
+      <div class="tile">
+        <div class="lab">Inter-rater &kappa;</div>
+        <div class="n mid good">0.966</div>
+        <div class="sub">2 raters &middot; rubric is well-specified</div>
+      </div>
+      <div class="tile">
+        <div class="lab">Flag rate, insufficient detail</div>
+        <div class="n mid good">95.5%</div>
+        <div class="sub">flags rather than guesses (NFR1)</div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div>
+        <h2>Confusion matrix — where it lands</h2>
+        <table class="cm">
+          <thead>
+            <tr>
+              <th class="corner">assigned &darr; / predicted &rarr;</th>
+              <th><span class="sev-dot" style="background:var(--crit)"></span>crit</th>
+              <th><span class="sev-dot" style="background:var(--urg)"></span>urg</th>
+              <th><span class="sev-dot" style="background:var(--rout)"></span>rout</th>
+              <th><span class="sev-dot" style="background:var(--fyi)"></span>fyi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th class="rowlab"><span class="sev-dot" style="background:var(--crit)"></span>critical</th>
+              <td><div class="cell" style="background:rgba(29,122,95,.62)">51</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.13)">2</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.15)">3</div></td>
+              <td><div class="cell">0</div></td>
+            </tr>
+            <tr>
+              <th class="rowlab"><span class="sev-dot" style="background:var(--urg)"></span>urgent</th>
+              <td><div class="cell" style="background:rgba(180,35,42,.11)">1</div></td>
+              <td><div class="cell" style="background:rgba(29,122,95,.66)">81</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.12)">3</div></td>
+              <td><div class="cell">0</div></td>
+            </tr>
+            <tr>
+              <th class="rowlab"><span class="sev-dot" style="background:var(--rout)"></span>routine</th>
+              <td><div class="cell">0</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.46)">42</div></td>
+              <td><div class="cell" style="background:rgba(29,122,95,.33)">31</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.18)">10</div></td>
+            </tr>
+            <tr>
+              <th class="rowlab"><span class="sev-dot" style="background:var(--fyi)"></span>fyi</th>
+              <td><div class="cell">0</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.13)">3</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.17)">6</div></td>
+              <td><div class="cell" style="background:rgba(29,122,95,.60)">47</div></td>
+            </tr>
+          </tbody>
+          <caption>Diagonal (teal) = correct. The dominant error is routine &rarr; urgent (42): the classifier escalates when unsure.</caption>
+        </table>
+      </div>
+
+      <div>
+        <h2>What it means</h2>
+        <ul class="find">
+          <li class="goodmark"><b>Critical detection is strong</b> — the 5 misses land as urgent or routine, never fyi.</li>
+          <li class="warnmark"><b>Over-triage is the main error</b> — routine calls escalated to urgent. For a safety tool this is the <i>safe</i> failure direction, but it drives unnecessary interrupts.</li>
+          <li class="goodmark"><b>NFR1 holds</b> — un-triageable messages are flagged, not guessed (95.5%).</li>
+          <li class="warnmark"><b>Degraded transcripts are harder</b> — realistic ASR noise costs 17 accuracy points (below).</li>
+          <li><b>Raters agree with each other</b> (&kappa; 0.966) and with the generator's labels 77.5% of the time.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="split2">
+      <div>
+        <h2>Cost-weighted error &middot; 633.5 total</h2>
+        <div class="bars">
+          <div class="barrow"><span class="bl">Missed critical (&times;5)</span><div class="track"><div class="fill" style="width:100%;background:var(--crit)"></div></div><span class="bv">500</span></div>
+          <div class="barrow"><span class="bl">Missed urgent (&times;3)</span><div class="track"><div class="fill" style="width:12%;background:var(--urg)"></div></div><span class="bv">60</span></div>
+          <div class="barrow"><span class="bl">Unnecessary interrupt (&times;45)</span><div class="track"><div class="fill" style="width:9%;background:var(--rout)"></div></div><span class="bv">45</span></div>
+          <div class="barrow"><span class="bl">Insufficient-detail guess (&times;1)</span><div class="track"><div class="fill" style="width:4%;background:var(--faint)"></div></div><span class="bv">20</span></div>
+          <div class="barrow"><span class="bl">Over-triage one tier (&times;17)</span><div class="track"><div class="fill" style="width:1.7%;background:var(--faint)"></div></div><span class="bv">8.5</span></div>
+        </div>
+        <div class="warn" style="margin-top:12px;"><b>Placeholder costs</b> (data need N4) — <b>79% of total cost comes from just 5 missed criticals</b>, by design. Not clinically grounded until elicited from the partner physician.</div>
+      </div>
+
+      <div>
+        <h2>Clean vs degraded &middot; the informative slice</h2>
+        <div class="bars">
+          <div class="barrow"><span class="bl">Clean (n=196)</span><div class="track"><div class="fill" style="width:80.1%;background:var(--good)"></div></div><span class="bv">80.1%</span></div>
+          <div class="barrow"><span class="bl">Degraded (n=84)</span><div class="track"><div class="fill" style="width:63.1%;background:var(--urg)"></div></div><span class="bv">63.1%</span></div>
+        </div>
+        <p style="font-size:12.5px;color:var(--slate);margin:12px 0 0;">ASR errors, truncation, missing SBAR fields, and calm-tone-on-critical distractors drop accuracy 17 points. Real voicemail transcripts look like the degraded set, not the clean one — so this gap is the honest read on field performance.</p>
+      </div>
+    </div>
+
+    <div>
+      <h2>Threshold sweep — the operating-point curve</h2>
+      <div class="chart">
+        <svg viewBox="0 0 620 210" role="img" aria-label="As the auto-route confidence cutoff rises, unnecessary interrupts and missed-urgent counts both fall.">
+          <g stroke="var(--line)" stroke-width="1">
+            <line x1="46" y1="20" x2="600" y2="20"/>
+            <line x1="46" y1="63" x2="600" y2="63"/>
+            <line x1="46" y1="106" x2="600" y2="106"/>
+            <line x1="46" y1="149" x2="600" y2="149"/>
+          </g>
+          <g font-size="10" fill="var(--faint)" text-anchor="end" font-family="Helvetica Neue,Arial,sans-serif">
+            <text x="40" y="23">48</text><text x="40" y="66">32</text><text x="40" y="109">16</text><text x="40" y="152">0</text>
+          </g>
+          <!-- x from 46..600 over cutoff 0..1; y baseline 149, scale 149-(v/48*129) -->
+          <!-- unnecessary_interrupt: 45,45,45,44,44,39,33,14,0 at cutoffs 0,.3,.4,.5,.6,.7,.8,.9,1 -->
+          <polyline fill="none" stroke="var(--rout)" stroke-width="2.5" stroke-linejoin="round"
+            points="46,28 212,28 258,28 304,31 350,31 396,44 442,60 488,111 600,149"/>
+          <!-- missed_urgent: 6,6,5,5,4,1,0,0,0 -->
+          <polyline fill="none" stroke="var(--crit)" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="1 0"
+            points="46,133 212,133 258,136 304,136 350,138 396,146 442,149 488,149 600,149"/>
+          <g font-size="10" fill="var(--faint)" text-anchor="middle" font-family="Helvetica Neue,Arial,sans-serif">
+            <text x="46" y="170">0.0</text><text x="304" y="170">0.5 &middot; confidence cutoff</text><text x="600" y="170">1.0</text>
+          </g>
+        </svg>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--rout)"></span>unnecessary interrupts (auto-routed)</span>
+          <span><span class="swatch" style="background:var(--crit)"></span>missed urgent (auto-routed)</span>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--slate);margin:10px 0 0;">Raising the cutoff sends more calls to human review, trading unnecessary interrupts down. A cutoff near <b>0.8</b> reaches zero missed-urgent among auto-routed calls at 33 unnecessary interrupts — a defensible operating point.</p>
+    </div>
+
+    <div class="limit">
+      <div class="lh">Limitation — read this into every number above</div>
+      The generator and the classifier share a model family (both gpt-5-mini) and therefore share blind spots. These synthetic results <b>validate the pipeline and tune the threshold; they do not establish real-world accuracy.</b> Rubric §1 tier definitions await partner-physician sign-off.
+    </div>
+
+  </div>
+
+  <footer>
+    <div class="prov">
+      <span><b>400</b> generated records</span>
+      <span>tiers <b>80 / 120 / 120 / 80</b> (critical/urgent/routine/fyi)</span>
+      <span><b>30%</b> degraded</span>
+      <span><b>12</b> arrival bursts</span>
+      <span>test <b>n=280</b></span>
+    </div>
+    Method: generate (label-first) &rarr; degrade &rarr; leakage check (bag-of-words baseline 82.5%, PASS) &rarr; stratified split &rarr; evaluate. Prevalence-reweighted metrics and cost matrix per <b>data/costs.yaml</b>. All data synthetic — no real patient information (C1 / NFR2).
+  </footer>
+</div>

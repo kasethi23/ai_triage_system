@@ -63,13 +63,35 @@ def _asr_errors(rng: random.Random, text: str) -> str:
     return " ".join(words)
 
 
+# Titles/abbreviations that end in a period but do not end a sentence.
+_ABBREV = {"dr", "mr", "mrs", "ms", "st", "sr", "jr", "prof", "no", "ext", "mg", "ml"}
+
+
+def _sentence_split(text: str) -> list[str]:
+    """Split into sentences without breaking on abbreviations like 'Dr.'."""
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    merged: list[str] = []
+    for p in parts:
+        if merged:
+            last_word = merged[-1].split()[-1] if merged[-1].split() else ""
+            if last_word.endswith(".") and last_word.rstrip(".").lower() in _ABBREV:
+                merged[-1] = f"{merged[-1]} {p}"
+                continue
+        merged.append(p)
+    return merged
+
+
 def _sbar_removal(text: str) -> str:
     # Keep only the leading "situation" sentence(s); drop background/recommendation.
-    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    sentences = _sentence_split(text)
     if len(sentences) <= 1:
         return text
     keep = 1 if len(sentences) >= 3 else len(sentences) - 1
-    return " ".join(sentences[:keep]).strip()
+    result = " ".join(sentences[:keep]).strip()
+    # Fallback: never reduce to a near-empty fragment; keep one more if too short.
+    if len(result.split()) < 6 and len(sentences) > keep:
+        result = " ".join(sentences[: keep + 1]).strip()
+    return result
 
 
 def _tone_distractor(rng: random.Random, text: str, severity: str) -> str:
@@ -91,11 +113,17 @@ def _tone_distractor(rng: random.Random, text: str, severity: str) -> str:
 
 
 def _truncate(rng: random.Random, record: dict) -> str:
+    """Reduce to an un-triageable fragment. Varied bed/extension numbers keep the
+    fragments from colliding into byte-identical duplicates across records."""
     role = record.get("generation_cell", {}).get("caller_role", "nurse")
+    bed = rng.randint(1, 40)
+    ext = rng.randint(1000, 9999)
     templates = [
-        f"{PHYSICIAN_PLACEHOLDER}, it's the {role}, can you call me back when you get this.",
-        f"Hi {PHYSICIAN_PLACEHOLDER}, call me about bed {rng.randint(1, 12)} when you get a chance.",
-        f"{PHYSICIAN_PLACEHOLDER}, need to talk to you about a patient, call me back please.",
+        f"{PHYSICIAN_PLACEHOLDER}, it's the {role}, can you call me back at extension {ext} when you get this.",
+        f"Hi {PHYSICIAN_PLACEHOLDER}, call me about bed {bed} when you get a chance.",
+        f"{PHYSICIAN_PLACEHOLDER}, need to talk to you about the patient in bed {bed}, please call back.",
+        f"{PHYSICIAN_PLACEHOLDER}, this is the {role} — give me a call at extension {ext} when you're free.",
+        f"{PHYSICIAN_PLACEHOLDER}, quick question about bed {bed}, call me back please.",
     ]
     return rng.choice(templates)
 
