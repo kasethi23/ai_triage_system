@@ -37,3 +37,4 @@ data/ratings/*.csv
 data/results/*
 !data/**/.gitkeep
 data/runtime_fewshot.jsonl
+venv311/

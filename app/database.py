@@ -24,23 +24,38 @@ def _migrate_sqlite_columns() -> None:
         return
 
     inspector = inspect(engine)
-    if "calls" not in inspector.get_table_names():
-        return
+    tables = set(inspector.get_table_names())
 
-    existing = {col["name"] for col in inspector.get_columns("calls")}
-    additions = {
-        "channel": "VARCHAR DEFAULT 'voicemail'",
-        "no_callback": "BOOLEAN DEFAULT 0",
-        "insufficient_detail": "BOOLEAN DEFAULT 0",
-        "severity": "VARCHAR DEFAULT 'fyi'",
-        "patient_name": "VARCHAR DEFAULT 'Unknown'",
-        "room": "VARCHAR DEFAULT ''",
-        "caller_name": "VARCHAR DEFAULT ''",
-        "caller_role": "VARCHAR DEFAULT ''",
-        "resolved": "BOOLEAN DEFAULT 0",
-    }
+    # Columns added to `calls` after the table already existed (sqlite demo db).
+    if "calls" in tables:
+        existing = {col["name"] for col in inspector.get_columns("calls")}
+        additions = {
+            "channel": "VARCHAR DEFAULT 'voicemail'",
+            "no_callback": "BOOLEAN DEFAULT 0",
+            "insufficient_detail": "BOOLEAN DEFAULT 0",
+            "severity": "VARCHAR DEFAULT 'fyi'",
+            "patient_name": "VARCHAR DEFAULT 'Unknown'",
+            "room": "VARCHAR DEFAULT ''",
+            "caller_name": "VARCHAR DEFAULT ''",
+            "caller_role": "VARCHAR DEFAULT ''",
+            "resolved": "BOOLEAN DEFAULT 0",
+        }
+        with engine.begin() as conn:
+            for column, ddl in additions.items():
+                if column not in existing:
+                    conn.execute(text(f"ALTER TABLE calls ADD COLUMN {column} {ddl}"))
 
-    with engine.begin() as conn:
-        for column, ddl in additions.items():
-            if column not in existing:
-                conn.execute(text(f"ALTER TABLE calls ADD COLUMN {column} {ddl}"))
+    # Columns added to `devices` after the table already existed. The table
+    # itself is created by Base.metadata.create_all(); this only backfills
+    # columns on a pre-existing devices table (repo migration convention).
+    if "devices" in tables:
+        existing = {col["name"] for col in inspector.get_columns("devices")}
+        additions = {
+            "platform": "VARCHAR DEFAULT 'ios'",
+            "created_at": "DATETIME",
+            "last_seen_at": "DATETIME",
+        }
+        with engine.begin() as conn:
+            for column, ddl in additions.items():
+                if column not in existing:
+                    conn.execute(text(f"ALTER TABLE devices ADD COLUMN {column} {ddl}"))
