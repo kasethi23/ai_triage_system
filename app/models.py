@@ -32,13 +32,50 @@ class Call(Base):
     no_callback: Mapped[bool] = mapped_column(Boolean, default=False)
     insufficient_detail: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    # Conduit Physician Console fields
+    # Conduit Physician Console fields. Identifiers (patient_name, room,
+    # caller_name, caller_role) live in CallIdentifiers, NOT here, so this row —
+    # and any export of it — is identifier-free by construction (privacy P4).
     severity: Mapped[str] = mapped_column(String, default="fyi")
+    resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class CallIdentifiers(Base):
+    """Identifiers split out of `calls` (privacy P4), joined 1:1 on call id.
+
+    Holds the patient/caller identifiers and the redaction token map. Kept in a
+    separate table so the labelled/exported `calls` data carries no identifiers by
+    construction, and so access to identity can be gated and logged (P7).
+    """
+
+    __tablename__ = "call_identifiers"
+
+    call_id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     patient_name: Mapped[str] = mapped_column(String, default="Unknown")
     room: Mapped[str] = mapped_column(String, default="")
     caller_name: Mapped[str] = mapped_column(String, default="")
     caller_role: Mapped[str] = mapped_column(String, default="")
-    resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+    # token -> original string, from de-identification (P6). JSON. Empty when
+    # redaction was off (transcript then still holds names — see SECURITY.md).
+    token_map_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class CallView(Base):
+    """Audit log of identity access (privacy P7).
+
+    PHIPA expects a custodian to answer *who accessed this record, and when.*
+    Every re-identification writes a row here.
+    """
+
+    __tablename__ = "call_views"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    call_id: Mapped[int] = mapped_column(Integer, index=True)
+    user: Mapped[str] = mapped_column(String, default="")
+    revealed_identifiers: Mapped[bool] = mapped_column(Boolean, default=False)
+    route: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
 
 class Correction(Base):
@@ -64,6 +101,8 @@ class Correction(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
+
+
 class Device(Base):
     """An iOS device registered to receive APNs push notifications.
 

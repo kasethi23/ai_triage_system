@@ -33,6 +33,12 @@ DEIDENTIFY_TRANSCRIPTS = os.getenv("DEIDENTIFY_TRANSCRIPTS", "false").strip().lo
     "yes",
 )
 
+# --- Audio retention (privacy spec P8) --------------------------------------
+# Voice is biometric and cannot be tokenised, so stored audio is the highest-risk
+# artifact. When false (default), the local recording is deleted after a
+# successful transcription and Twilio's retained copy is deleted via the REST API.
+RETAIN_AUDIO = os.getenv("RETAIN_AUDIO", "false").strip().lower() in ("1", "true", "yes")
+
 # --- API auth ---------------------------------------------------------------
 # Bearer token required on /calls*, /devices*, and the SSE stream. If unset we
 # allow unauthenticated access for local dev (with a loud warning), but never

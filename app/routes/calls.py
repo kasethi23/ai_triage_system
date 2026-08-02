@@ -5,10 +5,14 @@ from pydantic import BaseModel
 from app.database import SessionLocal
 from app.models import Call
 from app.services.corrections import record_correction
-from app.services.storage import call_to_dict
+from app.services.storage import call_to_dict, reidentify
 from app.sse import broker
 
 router = APIRouter(tags=["calls"])
+
+# Single-user auth (P2), so the acting user is fixed. Multi-user identity is
+# documented as deferred in SECURITY.md.
+_PHYSICIAN_USER = "physician"
 
 
 class CorrectionIn(BaseModel):
@@ -47,6 +51,23 @@ def get_call(call_id: int) -> dict:
         if call is None:
             raise HTTPException(status_code=404, detail="Call not found")
         return call_to_dict(call)
+    finally:
+        db.close()
+
+
+@router.get("/calls/{call_id}/identified")
+def get_call_identified(call_id: int) -> dict:
+    """Return the re-identified call — real names/room, transcript restored —
+    and LOG the access (privacy P7). Distinct from GET /calls/{id}, which is
+    redacted by default. This is the event a PHIPA audit asks about."""
+    db = SessionLocal()
+    try:
+        record = reidentify(
+            db, call_id, user=_PHYSICIAN_USER, route="GET /calls/{id}/identified"
+        )
+        if record is None:
+            raise HTTPException(status_code=404, detail="Call not found")
+        return record
     finally:
         db.close()
 
