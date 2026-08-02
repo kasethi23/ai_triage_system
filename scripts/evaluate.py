@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -295,7 +296,17 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--mock", action="store_true", help="Offline deterministic predictor (no API)")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument(
+        "--no-runtime-fewshot",
+        action="store_true",
+        help="Run with the runtime few-shot pool DISABLED, to measure the effect "
+        "of accumulated physician corrections (Task 12).",
+    )
     args = ap.parse_args()
+
+    if args.no_runtime_fewshot:
+        os.environ["RUNTIME_FEWSHOT_ENABLED"] = "false"
+        print("Runtime few-shot pool DISABLED for this run.")
 
     test = load_split("test", allow_test=True)
     if not test:

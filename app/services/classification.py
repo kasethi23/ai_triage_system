@@ -2,7 +2,13 @@ import json
 
 from openai import OpenAI
 
-from app.config import OPENAI_API_KEY, OPENAI_CLASSIFICATION_MODEL
+from app.config import (
+    FEWSHOT_MAX_EXAMPLES,
+    OPENAI_API_KEY,
+    OPENAI_CLASSIFICATION_MODEL,
+    RUNTIME_FEWSHOT_PATH,
+    runtime_fewshot_enabled,
+)
 
 _client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -143,19 +149,67 @@ _RESPONSE_SCHEMA = {
 }
 
 
+def _load_runtime_fewshot() -> list[dict]:
+    """Load the physician-corrected runtime few-shot pool (Task 12).
+
+    Returns [] if disabled or the file is absent. Records are worked examples
+    written by scripts/promote_corrections.py, each with `transcript`,
+    `corrected_field`, and `corrected_label`.
+    """
+    if not runtime_fewshot_enabled() or not RUNTIME_FEWSHOT_PATH.exists():
+        return []
+    examples = []
+    with open(RUNTIME_FEWSHOT_PATH, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                examples.append(json.loads(line))
+    return examples[:FEWSHOT_MAX_EXAMPLES]
+
+
+def _fewshot_messages() -> list[dict]:
+    """Prepend physician-corrected worked examples as prior turns.
+
+    This is how the correction loop closes — through prompt context, not weights.
+    Promotion into the pool is human-approved (see promote_corrections.py).
+    """
+    examples = _load_runtime_fewshot()
+    if not examples:
+        return []
+    msgs = [
+        {
+            "role": "system",
+            "content": (
+                "The following are physician-corrected worked examples. Treat "
+                "their labels as authoritative when a new transcript is similar."
+            ),
+        }
+    ]
+    for ex in examples:
+        field = ex.get("corrected_field", "severity")
+        label = ex.get("corrected_label", "")
+        msgs.append({"role": "user", "content": f"Transcript:\n\n{ex.get('transcript', '')}"})
+        msgs.append({"role": "assistant", "content": json.dumps({field: label})})
+    return msgs
+
+
 def classify_transcript(transcript: str) -> dict:
     """Send a transcript to OpenAI for structured triage classification.
 
     Returns the parsed classification dict. `urgency` is not requested from the
     model; it is derived here from `severity` via SEVERITY_TO_URGENCY so callers
     (e.g. storage.py) can keep reading `classification["urgency"]` unchanged.
+
+    Any physician-corrected examples in the runtime few-shot pool are prepended
+    as worked examples (Task 12), unless RUNTIME_FEWSHOT_ENABLED is off.
     """
+    messages = [{"role": "system", "content": _SYSTEM_PROMPT}]
+    messages.extend(_fewshot_messages())
+    messages.append({"role": "user", "content": f"Transcript:\n\n{transcript}"})
+
     response = _client.chat.completions.create(
         model=OPENAI_CLASSIFICATION_MODEL,
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": f"Transcript:\n\n{transcript}"},
-        ],
+        messages=messages,
         response_format=_RESPONSE_SCHEMA,
     )
 

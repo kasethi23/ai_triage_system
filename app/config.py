@@ -19,3 +19,21 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
 
 AUDIO_STORAGE_DIR = Path(os.getenv("AUDIO_STORAGE_DIR", "./audio_recordings")).resolve()
 AUDIO_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Correction feedback loop (Task 12). The runtime few-shot pool holds physician-
+# corrected worked examples that classify_transcript prepends to the prompt.
+# RUNTIME_FEWSHOT_ENABLED is read live (per call) so evaluate.py can measure the
+# classifier with and without it.
+RUNTIME_FEWSHOT_PATH = Path(
+    os.getenv("RUNTIME_FEWSHOT_PATH", str(BASE_DIR / "data" / "runtime_fewshot.jsonl"))
+)
+FEWSHOT_MAX_EXAMPLES = int(os.getenv("FEWSHOT_MAX_EXAMPLES", "8"))
+
+
+def runtime_fewshot_enabled() -> bool:
+    """Read the toggle live so a run can flip it via env without re-import."""
+    return os.getenv("RUNTIME_FEWSHOT_ENABLED", "true").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    )
