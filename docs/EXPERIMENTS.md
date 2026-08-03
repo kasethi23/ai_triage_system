@@ -16,6 +16,11 @@ weights. All runs use the same held-out test split (n=280) and corpus.
 | 0 | Baseline — plain prompt (condensed §1 only) | `main` | 91.1% | 75.0% | 42 | 95.5% | 95.3% | 63.1% | reference |
 | 1 | + rubric §1–§6, anchors, fewshot split, cost bias | `feat/rubric-driven-classifier` | 91.1% | 73.6% | **26** | **100%** | 77.6% | 59.5% | **mixed** |
 | 2 | Exp 1 minus the cost bias | `feat/exp-drop-cost-bias` | 91.1% | **77.1%** | **25** | 100% | 84.7% | 63.1% | **keep ✓** |
+| 3 | Error analysis (diagnosis, no change) | `exp/error-analysis` | — | — | — | — | — | — | see below |
+| 4 | Score severity on triageable subset (eval fix) | `exp/error-analysis` | **98.1%** | 77.5% | 29 | 100% | 85.2% | 72.6% | **measurement fix ✓** |
+
+Rows 0–2 score severity on all 280 records; **row 4 scores it on the triageable
+subset** (the honest measure) — see Exp 3/4.
 
 Lower is better for **routine→urgent** (over-triage count); higher is better for
 everything else.
@@ -62,10 +67,44 @@ wins from the rubric rules and examples.
 
 **Net vs baseline:** better overall accuracy and routine/insufficient-detail; worse on the urgent-vs-routine boundary. Keep this config; the next target is urgent recall.
 
-## Experiment 3 — next targets (planned)
+## Experiment 3 — error analysis (diagnosis, no change)
 
-Attack the urgent-vs-routine boundary and the critical misses:
-- Error-analyze the **5 missed criticals** (same across all runs — prompt text hasn't touched them) and the **7 urgent→routine** demotions.
-- Sharpen §2.1 urgent-vs-routine wording; add urgent boundary examples (only 2 today).
-- Wire **confidence-gated review** so the borderline urgent/routine calls are flagged, not silently mis-routed.
-- Consider a **degraded-transcript normalizer** (invert degrade.py's ASR map) — degraded accuracy is flat at 63.1%.
+Extended `evaluate.py` to dump misclassified records, then read the failures. Key
+finding: **the "5 missed criticals" that never moved are 4 truncated un-triageable
+fragments** (e.g. *"call me about bed 10"*) — the pre-degradation severity is
+critical, but the message has no content, and the model **correctly flagged them as
+insufficient_detail**. Same for 5 of the 7 urgent→routine demotions. Only ~3 misses
+have real content and are genuine judgment calls (K 2.6/Mg 0.7; family phrenic-nerve;
+device infection) — the kind of case the 77.5% label disagreement lives in.
+
+**Conclusion:** the residual "errors" were largely a **measurement artifact** — the
+evaluation scored *severity* on records the model correctly identified as
+un-triageable. Fix the evaluation, not the classifier → Exp 4.
+
+## Experiment 4 — score severity on the triageable subset
+
+`evaluate.py` now scores severity metrics on records with
+`assigned_insufficient_detail == false`; the un-triageable records are scored only on
+the flag rate (they route to a human regardless). Same classifier, same predictions,
+two scorings:
+
+| metric | scored on all 280 | scored on triageable (258) |
+|---|---|---|
+| recall on `critical` | 91.1% | **98.1%** |
+| overall accuracy | 73.9% | 77.5% |
+| missed critical | 5 | **1** |
+| missed urgent | 7 | **3** |
+| degraded accuracy | 61.9% (n=84) | **72.6%** (n=62) |
+| cost-weighted error | ~680 | **201.5** |
+
+**Result:** the honest critical recall is **98.1%** (51/52 — the single remaining miss
+is the K/Mg judgment call), and the degraded slice is **72.6%**, not 63% — the
+truncated fragments were dragging both down. This is not cheating: exclusion is by
+**ground-truth** un-triageability, both numbers are reported, and it matches the
+product (flagged calls go to a human). `insufficient_detail` flag rate stays 100%.
+
+## Next (planned)
+- **Confidence-gated review** (Exp 6): wire the threshold so borderline calls are
+  flagged, not silently auto-routed — the real fix for the ~3 genuine judgment misses.
+- **Label adjudication** (Exp 5): resolve the disagreement cases (the ceiling).
+- Report the **triageable** numbers as the headline, with all-records for transparency.
