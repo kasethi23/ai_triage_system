@@ -23,7 +23,7 @@ the tap→deep-link path without APNs.
 1. Run the app in a simulator, note the booted device, then background the
    app (Cmd-Shift-H).
 2. Create `push.json` (this mirrors exactly what `app/services/push.py`
-   sends for a `severe` call — `call_id` must exist on the backend the app
+   sends for a `critical` call — `call_id` must exist on the backend the app
    points at; use an id from `GET /calls`):
 
    ```json
@@ -35,7 +35,7 @@ the tap→deep-link path without APNs.
        },
        "sound": "default",
        "badge": 1,
-       "thread-id": "severity-severe",
+       "thread-id": "severity-critical",
        "interruption-level": "time-sensitive"
      },
      "call_id": 1
@@ -53,7 +53,7 @@ the tap→deep-link path without APNs.
    on the Call Detail view for `call_id`.
 
 Repeat with `"interruption-level"` removed and title `URGENT: ...` to spot-
-check the emergent shape.
+check the urgent shape.
 
 ## (b) End-to-end: locked phone → deployed backend → time-sensitive push
 
@@ -76,12 +76,12 @@ Requires: backend deployed (Railway) with `APNS_*` env vars set
    ```bash
    curl -s -X POST "$BASE/devices/test-push" \
      -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-     -d '{"severity": "severe"}'
+     -d '{"severity": "critical"}'
    ```
 
    Full-pipeline path (audio → Whisper → classifier → store → push), run
    against the deployed backend's database, with a recording that describes
-   a life-threatening situation so it classifies as `severe`:
+   a life-threatening situation so it classifies as `critical`:
 
    ```bash
    DATABASE_URL=<deployed-db-or-railway-run> python scripts/seed_demo.py critical_sample.wav
@@ -98,11 +98,11 @@ Requires: backend deployed (Railway) with `APNS_*` env vars set
 6. Tap **Resolve** → confirm the call flips to Resolved in the React web
    console (refresh `GET /calls` or watch the SSE-driven dashboard).
 7. Negative check: `POST /devices/test-push` with `{"severity":
-   "semi-urgent"}` and `{"severity": "non-urgent"}` must produce **no**
+   "routine"}` and `{"severity": "fyi"}` must produce **no**
    push (response shows `"would_push": false`).
 
 ## Badge
 
-The badge equals the unresolved severe+emergent count. It is set by the
+The badge equals the unresolved critical+urgent count. It is set by the
 server in each push payload and re-synced by the app on every list refresh
 and resolve.

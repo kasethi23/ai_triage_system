@@ -137,7 +137,9 @@ def _row(record, predicted, confidence, pred_insufficient):
         "assigned_insufficient": bool(record.get("assigned_insufficient_detail")),
         "pred_insufficient": bool(pred_insufficient),
         "degraded": bool(record.get("degradations")),
+        "degradations": record.get("degradations", []),
         "cell": record.get("generation_cell", {}),
+        "transcript": record.get("transcript", ""),
     }
 
 
@@ -246,23 +248,43 @@ def _fmt_confusion(conf, reweighted=False):
 
 
 def build_summary(rows, costs, prevalence) -> str:
-    conf = confusion_matrix(rows)
+    # Severity is scored on the TRIAGEABLE subset only (Exp 4): records the caller
+    # gave enough information to triage. The un-triageable records (ground-truth
+    # assigned_insufficient_detail) are scored ONLY on the flag rate below, not on
+    # severity — in production they are routed to a human regardless of the model's
+    # best-guess severity, so grading that guess measures nothing real.
+    tri = [r for r in rows if not r["assigned_insufficient"]]
+    n_all, n_tri = len(rows), len(tri)
+
+    conf = confusion_matrix(tri)
     rw = reweight_confusion(conf, prevalence)
-    total = len(rows)
-    overall = sum(conf[t].get(t, 0) for t in SEVERITY_TIERS) / total if total else float("nan")
-    cost_total, cost_break = cost_weighted_error(rows, costs)
-    insuf = insufficient_detail_behaviour(rows)
-    sweep = threshold_sweep(rows)
-    deg = degradation_slice(rows)
+    overall = sum(conf[t].get(t, 0) for t in SEVERITY_TIERS) / n_tri if n_tri else float("nan")
+    conf_all = confusion_matrix(rows)
+    overall_all = sum(conf_all[t].get(t, 0) for t in SEVERITY_TIERS) / n_all if n_all else float("nan")
+    total = n_tri
+    cost_total, cost_break = cost_weighted_error(tri, costs)
+    insuf = insufficient_detail_behaviour(rows)  # on ALL rows (the un-triageable subset)
+    sweep = threshold_sweep(tri)
+    deg = degradation_slice(tri)
 
     L = []
     L.append("CONDUIT CLASSIFIER EVALUATION")
     L.append("=" * 60)
     L.append(LIMITATION)
     L.append("")
-    L.append(f"Test records: {total}   Overall accuracy: {overall:.1%}")
+    L.append(
+        f"Severity scored on the TRIAGEABLE subset (n={n_tri}); the {n_all - n_tri} "
+        "un-triageable records are scored only on the flag rate, not severity."
+    )
+    L.append(
+        f"Overall accuracy — triageable: {overall:.1%}   "
+        f"(all {n_all} incl. un-triageable: {overall_all:.1%})"
+    )
     L.append("")
-    L.append(f">>> HEADLINE — recall on `critical`: {recall(conf, 'critical'):.1%}")
+    L.append(
+        f">>> HEADLINE — recall on `critical` (triageable): {recall(conf, 'critical'):.1%}   "
+        f"(all records: {recall(conf_all, 'critical'):.1%})"
+    )
     L.append("")
     L.append("Confusion matrix (raw counts):")
     L.append(_fmt_confusion(conf))
@@ -325,26 +347,53 @@ def main() -> None:
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    conf = confusion_matrix(rows)
+    tri = [r for r in rows if not r["assigned_insufficient"]]  # triageable subset (Exp 4)
+    conf_tri = confusion_matrix(tri)
+    conf_all = confusion_matrix(rows)
     result = {
         "generated_at": stamp,
         "mock": args.mock,
         "limitation": LIMITATION,
         "n_test": len(rows),
-        "confusion_raw": {a: dict(conf[a]) for a in SEVERITY_TIERS},
-        "confusion_reweighted": reweight_confusion(conf, prevalence),
-        "recall_critical": recall(conf, "critical"),
+        "n_triageable": len(tri),
+        # Severity metrics: triageable subset is the honest measure.
+        "confusion_raw_triageable": {a: dict(conf_tri[a]) for a in SEVERITY_TIERS},
+        "confusion_raw_all": {a: dict(conf_all[a]) for a in SEVERITY_TIERS},
+        "confusion_reweighted_triageable": reweight_confusion(conf_tri, prevalence),
+        "recall_critical_triageable": recall(conf_tri, "critical"),
+        "recall_critical_all": recall(conf_all, "critical"),
         "cost_weighted": dict(zip(("total", "breakdown"),
-                                  (lambda t, b: (t, dict(b)))(*cost_weighted_error(rows, costs)))),
+                                  (lambda t, b: (t, dict(b)))(*cost_weighted_error(tri, costs)))),
         "insufficient_detail": insufficient_detail_behaviour(rows),
-        "degradation_slice": degradation_slice(rows),
-        "threshold_sweep": threshold_sweep(rows),
+        "degradation_slice_triageable": degradation_slice(tri),
+        "threshold_sweep_triageable": threshold_sweep(tri),
         "prevalence": prevalence,
         "costs_are_placeholder": True,
     }
     (RESULTS_DIR / f"eval_{stamp}.json").write_text(json.dumps(result, indent=2))
     (RESULTS_DIR / f"eval_{stamp}.txt").write_text(summary + "\n")
-    print(f"\nWrote data/results/eval_{stamp}.json and .txt")
+    # Save ALL per-record predictions so future re-scoring needs no classifier re-run.
+    (RESULTS_DIR / f"predictions_{stamp}.jsonl").write_text(
+        "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
+    )
+
+    # Misclassification dump for error analysis (Exp 3): every row where the
+    # predicted tier != assigned tier, with the transcript, so failures can be read.
+    misses = [r for r in rows if r["assigned"] != r["predicted"]]
+    misses.sort(key=lambda r: (SEVERITY_TIERS.index(r["assigned"]), r["predicted"]))
+    (RESULTS_DIR / f"misclassified_{stamp}.jsonl").write_text(
+        "".join(json.dumps(m, ensure_ascii=False) + "\n" for m in misses)
+    )
+    lines = [f"MISCLASSIFIED — {len(misses)} of {len(rows)} test records\n"]
+    for m in misses:
+        deg = ",".join(m.get("degradations") or []) or "clean"
+        lines.append(
+            f"\n[{m['id']}] assigned={m['assigned']} -> predicted={m['predicted']}  "
+            f"(conf={m['confidence']:.2f}, {deg}, topic={m['cell'].get('clinical_topic','?')})\n"
+            f"    {m['transcript']}\n"
+        )
+    (RESULTS_DIR / f"misclassified_{stamp}.txt").write_text("".join(lines))
+    print(f"\nWrote data/results/eval_{stamp}.json/.txt and misclassified_{stamp}.jsonl/.txt")
 
 
 if __name__ == "__main__":
