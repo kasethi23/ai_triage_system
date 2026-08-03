@@ -170,32 +170,11 @@ def _system_prompt() -> str:
     signals = _rubric.signals_not_to_use()
     if signals:
         prompt += " Signals that must NOT influence the severity decision: " + signals
-    cost = _cost_bias()
-    if cost:
-        prompt += " " + cost
+    # Exp 2: the cost-sensitivity instruction (Exp 1) is removed — it over-escalated
+    # borderline calls to critical without improving critical recall. See
+    # docs/EXPERIMENTS.md. The asymmetric cost matrix still governs the offline
+    # evaluation and could instead drive a runtime confidence-gated review.
     return prompt
-
-
-def _cost_bias() -> str:
-    """Communicate the asymmetric cost matrix (data/costs.yaml) to the model, so
-    it errs toward higher acuity when genuinely uncertain — the same cost-sensitive
-    framing the offline evaluator uses. Empty string if costs are unavailable."""
-    try:
-        import yaml
-
-        costs = yaml.safe_load(_COSTS_PATH.read_text(encoding="utf-8")) or {}
-    except Exception:  # noqa: BLE001 — best effort; classifier still works without it
-        return ""
-    missed = costs.get("missed_critical")
-    interrupt = costs.get("unnecessary_interrupt")
-    if not missed or not interrupt:
-        return ""
-    ratio = int(round(missed / interrupt))
-    return (
-        f"Errors are not equally costly: missing a critical call is roughly {ratio}x "
-        "as costly as an unnecessary interruption. When you are genuinely uncertain "
-        "between two adjacent severity tiers, prefer the higher-acuity tier."
-    )
 
 
 def _severity_description() -> str:
