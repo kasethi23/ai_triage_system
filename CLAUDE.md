@@ -64,8 +64,12 @@ LLM-inferred flags: `no_callback` (caller explicitly needs no reply) and
 `insufficient_detail` (transcript can't be triaged; flag, don't guess — NFR1).
 `channel` (`text | voicemail | phone`) is set from the ingestion path, not inferred.
 
-The severity tier descriptions in the classifier JSON schema mirror `data/rubric.md`
-§1 — **`rubric.md` is the authority; keep the schema text in sync with it.**
+The classifier builds its prompt **live from `data/rubric.md`** via
+`app/services/rubric.py`: §1 tier definitions + §2.1 boundary rules go into the
+severity schema description, §6 signals-not-to-use into the system prompt, and §2
+anchors are injected as few-shot examples. **Editing `rubric.md` changes
+classifications** — it is the single source of truth, not a copied constant.
+(Falls back to an embedded constant only if the rubric is missing/unfilled.)
 
 Two ingestion entry points in `storage.py`, sharing `_classify_and_store`:
 - `process_call_recording(...)` — audio path (Twilio): save audio → transcribe → classify → store → push.

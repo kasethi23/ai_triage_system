@@ -1,3 +1,4 @@
+import copy
 import json
 
 from openai import OpenAI
@@ -9,6 +10,7 @@ from app.config import (
     RUNTIME_FEWSHOT_PATH,
     runtime_fewshot_enabled,
 )
+from app.services import rubric as _rubric
 
 _client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -24,7 +26,7 @@ SEVERITY_TO_URGENCY = {
     "fyi": "informational",
 }
 
-_SYSTEM_PROMPT = (
+_SYSTEM_PROMPT_BASE = (
     "You are a clinical call triage assistant for an on-call electrophysiology "
     "(EP) attending. You receive a transcript of a message left by clinical "
     "staff, ideally in SBAR format (Situation, Background, Assessment, "
@@ -33,12 +35,10 @@ _SYSTEM_PROMPT = (
     "response time and action, not on vocabulary or emotional register."
 )
 
-# Severity tier definitions. These mirror data/rubric.md §1 (the team-written
-# clinical ground truth) and MUST be kept in sync with it — the rubric is the
-# authority, this is a copy embedded in the schema so the model sees the
-# definitions. Framed in terms of required response time and action, matching
-# the physician's interrupt-now / hold / log decision.
-_SEVERITY_DESCRIPTION = (
+# Fallback severity description, used ONLY when data/rubric.md is missing or its
+# §1 is unfilled. Normally the description is built live from the rubric (see
+# _severity_description) so the rubric is the single source of truth.
+_SEVERITY_DESCRIPTION_FALLBACK = (
     "Triage severity for the on-call EP physician, judged on required response "
     "time and action, not on the caller's tone or word choice. "
     "'critical' = life- or limb-threatening; the attending must be interrupted "
@@ -52,7 +52,7 @@ _SEVERITY_DESCRIPTION = (
     "for awareness."
 )
 
-_RESPONSE_SCHEMA = {
+_RESPONSE_SCHEMA_TEMPLATE = {
     "type": "json_schema",
     "json_schema": {
         "name": "call_classification",
@@ -62,7 +62,7 @@ _RESPONSE_SCHEMA = {
             "properties": {
                 "severity": {
                     "type": "string",
-                    "description": _SEVERITY_DESCRIPTION,
+                    "description": _SEVERITY_DESCRIPTION_FALLBACK,
                     "enum": ["critical", "urgent", "routine", "fyi"],
                 },
                 "request_type": {
@@ -149,6 +149,65 @@ _RESPONSE_SCHEMA = {
 }
 
 
+# --- Rubric-driven prompt assembly ------------------------------------------
+# The rubric (data/rubric.md) is the single source of truth. These builders read
+# it at call time, so editing the rubric changes what the classifier is told:
+# tier definitions (§1), boundary rules (§2.1), signals-not-to-use (§6), and
+# anchor examples (§2) all flow into the request.
+
+
+def _system_prompt() -> str:
+    prompt = _SYSTEM_PROMPT_BASE
+    signals = _rubric.signals_not_to_use()
+    if signals:
+        prompt += " Signals that must NOT influence the severity decision: " + signals
+    return prompt
+
+
+def _severity_description() -> str:
+    """Built from rubric §1 tier definitions + §2.1 boundary rules. Falls back to
+    the embedded constant only if the rubric is missing/unfilled."""
+    if not _rubric.is_usable():
+        return _SEVERITY_DESCRIPTION_FALLBACK
+    defs = _rubric.tier_definitions()
+    parts = [
+        "Triage severity for the on-call EP physician, judged on required response "
+        "time and action, not on the caller's tone or word choice."
+    ]
+    for tier in ("critical", "urgent", "routine", "fyi"):
+        parts.append(f"'{tier}' = {defs[tier]}")
+    boundary = _rubric.boundary_rules()
+    if boundary:
+        parts.append("Boundary rules — " + boundary)
+    return " ".join(parts)
+
+
+def _response_schema() -> dict:
+    schema = copy.deepcopy(_RESPONSE_SCHEMA_TEMPLATE)
+    schema["json_schema"]["schema"]["properties"]["severity"]["description"] = _severity_description()
+    return schema
+
+
+def _rubric_fewshot() -> list[dict]:
+    """The rubric's §2 anchor examples as worked examples with their correct
+    severity. These are the partner's source scenarios — held separate from the
+    test set — so they are leakage-safe."""
+    anchors = _rubric.anchor_examples()
+    pairs: list[dict] = []
+    for tier in ("critical", "urgent", "routine", "fyi"):
+        for quote in anchors.get(tier, []):
+            pairs.append({"role": "user", "content": f"Transcript:\n\n{quote}"})
+            pairs.append({"role": "assistant", "content": json.dumps({"severity": tier})})
+    if not pairs:
+        return []
+    return [
+        {
+            "role": "system",
+            "content": "Reference examples from the rubric, each with its correct severity:",
+        }
+    ] + pairs
+
+
 def _load_runtime_fewshot() -> list[dict]:
     """Load the physician-corrected runtime few-shot pool (Task 12).
 
@@ -203,14 +262,15 @@ def classify_transcript(transcript: str) -> dict:
     Any physician-corrected examples in the runtime few-shot pool are prepended
     as worked examples (Task 12), unless RUNTIME_FEWSHOT_ENABLED is off.
     """
-    messages = [{"role": "system", "content": _SYSTEM_PROMPT}]
-    messages.extend(_fewshot_messages())
+    messages = [{"role": "system", "content": _system_prompt()}]
+    messages.extend(_rubric_fewshot())       # §2 anchor examples (rubric)
+    messages.extend(_fewshot_messages())     # physician corrections (Task 12)
     messages.append({"role": "user", "content": f"Transcript:\n\n{transcript}"})
 
     response = _client.chat.completions.create(
         model=OPENAI_CLASSIFICATION_MODEL,
         messages=messages,
-        response_format=_RESPONSE_SCHEMA,
+        response_format=_response_schema(),
     )
 
     content = response.choices[0].message.content
