@@ -1,6 +1,6 @@
 # Security & data handling
 
-Conduit / ClinRoute processes clinical voicemails for an on-call electrophysiology
+ClinRoute processes clinical voicemails for an on-call electrophysiology
 attending. This document describes what data the prototype stores, where, and for
 how long; what crosses to third parties; and which privacy controls are
 **implemented**, **designed but not enabled**, or a **known gap**.

@@ -1,4 +1,4 @@
-<title>Conduit — Measurement fix: scoring severity on triageable calls</title>
+<title>ClinRoute — Measurement fix: scoring severity on triageable calls</title>
 <style>
   :root{
     --bg:#e9e7e0; --paper:#f7f6f2; --card:#ffffff; --band:#132a43;
@@ -58,7 +58,7 @@
 
 <div class="wrap">
   <div class="band">
-    <p class="kick">Conduit &middot; classifier &middot; experiment 4 (measurement fix)</p>
+    <p class="kick">ClinRoute &middot; classifier &middot; experiment 4 (measurement fix)</p>
     <h1>Scoring severity only on calls that can actually be triaged</h1>
     <p>Same classifier, same 280-record test set, the same predictions — the only change is how we score. ~30% of the corpus is degraded; some records are truncated to un-triageable fragments (e.g. "call me about bed 10"). Those carry a pre-degradation severity but no content — the model correctly flags them as insufficient-detail, yet the old scoring still graded their severity.</p>
   </div>

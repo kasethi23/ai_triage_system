@@ -1,11 +1,11 @@
-# Conduit — User guide
+# ClinRoute — User guide
 
 A one-page guide for the people who **use** the tool: the staff who leave messages,
 and the on-call physician who reads the queue. (Developer docs live in `CLAUDE.md`.)
 
 ## What this tool is — and isn't
 
-Conduit listens to on-call messages, transcribes them, and **ranks them by urgency**
+ClinRoute listens to on-call messages, transcribes them, and **ranks them by urgency**
 so the on-call EP physician answers the most urgent call first instead of in arrival
 order.
 

@@ -83,7 +83,7 @@ def predict_real(test_records, limit=None):
     import os
     import tempfile
 
-    db_path = Path(tempfile.gettempdir()) / "conduit_eval.db"
+    db_path = Path(tempfile.gettempdir()) / "clinroute_eval.db"
     if db_path.exists():
         db_path.unlink()
     os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"

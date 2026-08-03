@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## What this is
 
-**Conduit / ClinRoute** — a clinical call-triage prototype for MSE 401 Group 18
+**ClinRoute** — a clinical call-triage prototype for MSE 401 Group 18
 (electrophysiology on-call triage, partner WRHN). A FastAPI backend answers a
 Twilio call, records an SBAR voicemail, transcribes it (OpenAI Whisper), classifies
 it (OpenAI structured output), stores it, and alerts the on-call physician — **SSE

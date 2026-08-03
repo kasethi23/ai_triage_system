@@ -1,0 +1,112 @@
+<title>ClinRoute — User Guide</title>
+<style>
+  :root{
+    --bg:#e9e7e0; --paper:#f7f6f2; --card:#ffffff; --band:#132a43;
+    --ink:#132a43; --slate:#5a6b7d; --faint:#8a8f96; --line:#ddd8ce;
+    --crit:#b4232a; --good:#1d7a5f; --steel:#2f6d8c;
+    --band-ink:#f4f2ec; --band-sub:#c6d2dd; --band-kick:#9fb4c6;
+    --do-bg:#eaf3ee; --dont-bg:#faece9;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0d141c; --paper:#131c26; --card:#17212c; --band:#0e2036; --ink:#e7eef5;
+    --slate:#a2b4c6; --faint:#7d8794; --line:#283644; --band-ink:#eef4fa; --band-sub:#a9c1d6; --band-kick:#7fa0bd;
+    --good:#4bbf95; --do-bg:#132a22; --dont-bg:#2a1614;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0d141c; --paper:#131c26; --card:#17212c; --band:#0e2036; --ink:#e7eef5;
+    --slate:#a2b4c6; --faint:#7d8794; --line:#283644; --band-ink:#eef4fa; --band-sub:#a9c1d6; --band-kick:#7fa0bd;
+    --good:#4bbf95; --do-bg:#132a22; --dont-bg:#2a1614;
+  }
+  :root[data-theme="light"]{
+    --bg:#e9e7e0; --paper:#f7f6f2; --card:#ffffff; --band:#132a43; --ink:#132a43;
+    --slate:#5a6b7d; --faint:#8a8f96; --line:#ddd8ce; --band-ink:#f4f2ec; --band-sub:#c6d2dd; --band-kick:#9fb4c6;
+    --good:#1d7a5f; --do-bg:#eaf3ee; --dont-bg:#faece9;
+  }
+  *{box-sizing:border-box;}
+  .wrap{font-family:"Helvetica Neue",-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    color:var(--ink); background:var(--paper); line-height:1.5; max-width:900px; margin:0 auto; border:1px solid var(--line);}
+  .band{background:var(--band); color:var(--band-ink); padding:24px 32px 22px;}
+  .kick{font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--band-kick); font-weight:600; margin:0 0 8px;}
+  .band h1{font-size:24px; margin:0; font-weight:700; letter-spacing:-.01em;}
+  .band p{margin:8px 0 0; color:var(--band-sub); font-size:13px; max-width:70ch;}
+  .body{padding:24px 32px 28px; display:flex; flex-direction:column; gap:22px;}
+  /* the one rule */
+  .rule{border:2px solid var(--crit); border-radius:6px; padding:18px 22px; background:color-mix(in srgb,var(--crit) 6%, var(--card));}
+  .rule .tag{display:inline-block; background:var(--crit); color:#fff; font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; padding:4px 10px; border-radius:3px;}
+  .rule h2{font-size:19px; margin:12px 0 6px; font-weight:700; color:var(--ink); border:0; padding:0; letter-spacing:0; text-transform:none;}
+  .rule p{margin:8px 0 0; font-size:13.5px;}
+  .rule b{color:var(--crit);}
+  h3{font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--slate); font-weight:700; margin:0 0 12px; padding-bottom:6px; border-bottom:2px solid var(--ink);}
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:22px;}
+  @media (max-width:720px){.two{grid-template-columns:1fr;}}
+  .role .who{font-size:13px; color:var(--slate); margin:0 0 12px;}
+  .list{display:flex; flex-direction:column; gap:10px;}
+  .item{display:grid; grid-template-columns:22px 1fr; gap:9px; font-size:13px; align-items:start;}
+  .badge{font-size:11px; font-weight:700; text-align:center; border-radius:4px; padding:2px 0; line-height:1.3;}
+  .badge.do{background:var(--do-bg); color:var(--good);}
+  .badge.dont{background:var(--dont-bg); color:var(--crit);}
+  .item b{font-weight:700;}
+  .caveats{background:var(--card); border:1px solid var(--line); border-left:3px solid var(--steel); border-radius:5px; padding:16px 18px;}
+  .caveats h3{border:0; padding:0; margin-bottom:9px; color:var(--steel);}
+  .caveats ul{margin:0; padding-left:18px; font-size:12.5px; color:var(--ink); display:flex; flex-direction:column; gap:6px;}
+  .caveats b{color:var(--ink);}
+  footer{padding:14px 32px 20px; border-top:1px solid var(--line); color:var(--faint); font-size:11px; background:var(--card);}
+</style>
+
+<div class="wrap">
+  <div class="band">
+    <p class="kick">ClinRoute &middot; on-call triage &middot; user guide</p>
+    <h1>Using the triage tool responsibly</h1>
+    <p>For the people who use it: the staff who leave on-call messages, and the physician who reads the queue. It ranks incoming calls by urgency so the most urgent is answered first — it is a decision aid, not a replacement for judgment, and not for real emergencies (use the emergency line for a code).</p>
+  </div>
+
+  <div class="body">
+
+    <div class="rule">
+      <span class="tag">The one rule</span>
+      <h2>Don't game the queue</h2>
+      <p>The tool ranks on <b>clinical facts</b> — the patient's condition, vitals, what's changing, and what you need — <b>not</b> on tone or urgency words. It is built to <b>ignore</b> dramatic phrasing, so dressing up a routine call to jump the line doesn't reliably work.</p>
+      <p>And it hurts everyone: inflating urgency <b>buries a real emergency</b> behind you, and once the ranking is noise the physician stops trusting it — making the tool <b>worse than none</b>. Every override and identity access is logged; there's nothing to win. <b>Say what's true, and let the facts set the priority.</b></p>
+    </div>
+
+    <div class="two">
+      <div class="role">
+        <h3>If you're leaving a message</h3>
+        <p class="who">Nurse &middot; referring physician &middot; staff &middot; family</p>
+        <div class="list">
+          <div class="item"><span class="badge do">DO</span><span>State the <b>situation plainly</b> — who/where, what's happening, the vitals, and what you need (SBAR works best).</span></div>
+          <div class="item"><span class="badge do">DO</span><span>Enter the <b>bed/room on the keypad</b> when prompted — it's more accurate than saying it.</span></div>
+          <div class="item"><span class="badge do">DO</span><span>Say <b>"no callback needed"</b> when you're just closing the loop — it keeps the queue clean.</span></div>
+          <div class="item"><span class="badge dont">DON'T</span><span>Don't <b>inflate</b> urgency to be seen sooner — the facts already rank it correctly.</span></div>
+          <div class="item"><span class="badge dont">DON'T</span><span>Don't <b>downplay a real emergency</b> — if minutes matter, say so, or use the emergency bypass / line.</span></div>
+          <div class="item"><span class="badge dont">DON'T</span><span>Don't leave a message with <b>no clinical content</b> ("call me about bed 7") — it can't be triaged and gets held for a human.</span></div>
+        </div>
+      </div>
+
+      <div class="role">
+        <h3>If you're the on-call physician</h3>
+        <p class="who">You are responsible for the call — the AI assists</p>
+        <div class="list">
+          <div class="item"><span class="badge do">DO</span><span>Treat the label as a <b>suggestion</b> — read the transcript and use your judgment.</span></div>
+          <div class="item"><span class="badge do">DO</span><span>Look promptly at anything <b>flagged for review</b> (insufficient detail / low confidence) — those are the ones the AI is unsure about.</span></div>
+          <div class="item"><span class="badge do">DO</span><span><b>Correct</b> a wrong classification — it feeds back (after human review) to improve the tool. Correct thoughtfully.</span></div>
+          <div class="item"><span class="badge dont">DON'T</span><span>Don't assume a <b>"routine" label means safe</b> — if it reads worse than its tag, act on your read.</span></div>
+          <div class="item"><span class="badge dont">DON'T</span><span>Don't view or export identity you don't need — <b>re-identification is audited</b> (PHIPA). No screenshots or sharing.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="caveats">
+      <h3>Every user should know — this is a prototype</h3>
+      <ul>
+        <li>The AI has a <b>small but real error rate</b> (it will occasionally mis-rank) — which is exactly why the physician stays in the loop.</li>
+        <li><b>Not approved for real patient data yet.</b> In testing/demos, use fabricated names and details only.</li>
+        <li>Audio passes through third-party services (phone provider, transcription) before de-identification — <b>don't speak real patient identifiers into a demo call.</b></li>
+        <li>If the tool does something wrong, <b>flag/override it and tell the team</b> — don't quietly work around it.</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <footer>ClinRoute — clinical on-call triage prototype (MSE 401 Group 18, partner WRHN). Guidance for clinical users; technical docs in CLAUDE.md and SECURITY.md.</footer>
+</div>
