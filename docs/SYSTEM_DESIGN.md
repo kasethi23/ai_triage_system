@@ -1,4 +1,4 @@
-# Conduit — System Design
+# ClinRoute — System Design
 
 Clinical call triage: Twilio voice → Whisper transcription → LLM urgency classification → real-time physician dashboard.
 
@@ -58,7 +58,7 @@ flowchart TB
         Physician["Physician"]
     end
 
-    subgraph Conduit["Conduit Platform"]
+    subgraph ClinRoute["ClinRoute Platform"]
         Backend["FastAPI Backend<br/>:8000"]
         Frontend["Physician Console<br/>React :5173"]
         DB[(SQLite)]
@@ -574,4 +574,4 @@ flowchart TD
 
 ---
 
-*Conduit Clinical Call Triage Demo — diagram-first system design*
+*ClinRoute Clinical Call Triage Demo — diagram-first system design*

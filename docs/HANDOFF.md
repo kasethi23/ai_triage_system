@@ -1,4 +1,4 @@
-# Project handoff — Conduit / ClinRoute (MSE 401 Group 18)
+# Project handoff — ClinRoute (MSE 401 Group 18)
 
 A summary of the work completed, the decisions behind it, the current state of the
 repo, and what's left for the team. EP call-triage tool, partner WRHN.

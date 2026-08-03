@@ -1,4 +1,4 @@
-# ClinRoute (Conduit) - Clinical Call Triage
+# ClinRoute - Clinical Call Triage
 
 FastAPI backend that answers a phone call via Twilio, records an SBAR-format
 voicemail, transcribes it (OpenAI Whisper), classifies it (OpenAI structured
@@ -100,7 +100,7 @@ All routes except `/voice/*` require `Authorization: Bearer $API_BEARER_TOKEN`
 | DELETE | `/devices/{token}` | Unregister a push token |
 | POST | `/devices/test-push` | Dev/demo: send a push of a chosen severity to all devices |
 
-## Frontend - Conduit Physician Console
+## Frontend - ClinRoute Physician Console
 
 A single-page React + TypeScript dashboard lives in `frontend/`. It expects
 the API at `http://localhost:8000` (CORS is enabled on the backend for this).

@@ -32,7 +32,7 @@ class Call(Base):
     no_callback: Mapped[bool] = mapped_column(Boolean, default=False)
     insufficient_detail: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    # Conduit Physician Console fields. Identifiers (patient_name, room,
+    # ClinRoute Physician Console fields. Identifiers (patient_name, room,
     # caller_name, caller_role) live in CallIdentifiers, NOT here, so this row —
     # and any export of it — is identifier-free by construction (privacy P4).
     severity: Mapped[str] = mapped_column(String, default="fyi")
