@@ -137,7 +137,9 @@ def _row(record, predicted, confidence, pred_insufficient):
         "assigned_insufficient": bool(record.get("assigned_insufficient_detail")),
         "pred_insufficient": bool(pred_insufficient),
         "degraded": bool(record.get("degradations")),
+        "degradations": record.get("degradations", []),
         "cell": record.get("generation_cell", {}),
+        "transcript": record.get("transcript", ""),
     }
 
 
@@ -344,7 +346,24 @@ def main() -> None:
     }
     (RESULTS_DIR / f"eval_{stamp}.json").write_text(json.dumps(result, indent=2))
     (RESULTS_DIR / f"eval_{stamp}.txt").write_text(summary + "\n")
-    print(f"\nWrote data/results/eval_{stamp}.json and .txt")
+
+    # Misclassification dump for error analysis (Exp 3): every row where the
+    # predicted tier != assigned tier, with the transcript, so failures can be read.
+    misses = [r for r in rows if r["assigned"] != r["predicted"]]
+    misses.sort(key=lambda r: (SEVERITY_TIERS.index(r["assigned"]), r["predicted"]))
+    (RESULTS_DIR / f"misclassified_{stamp}.jsonl").write_text(
+        "".join(json.dumps(m, ensure_ascii=False) + "\n" for m in misses)
+    )
+    lines = [f"MISCLASSIFIED — {len(misses)} of {len(rows)} test records\n"]
+    for m in misses:
+        deg = ",".join(m.get("degradations") or []) or "clean"
+        lines.append(
+            f"\n[{m['id']}] assigned={m['assigned']} -> predicted={m['predicted']}  "
+            f"(conf={m['confidence']:.2f}, {deg}, topic={m['cell'].get('clinical_topic','?')})\n"
+            f"    {m['transcript']}\n"
+        )
+    (RESULTS_DIR / f"misclassified_{stamp}.txt").write_text("".join(lines))
+    print(f"\nWrote data/results/eval_{stamp}.json/.txt and misclassified_{stamp}.jsonl/.txt")
 
 
 if __name__ == "__main__":
