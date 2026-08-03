@@ -1,0 +1,218 @@
+<title>Conduit — Classifier Evaluation (Exp 2, best config)</title>
+<style>
+  :root{
+    --bg:#e9e7e0; --paper:#f7f6f2; --card:#ffffff; --band:#132a43;
+    --ink:#132a43; --slate:#5a6b7d; --faint:#8a8f96; --line:#ddd8ce;
+    --crit:#b4232a; --urg:#bd7b18; --rout:#2f6d8c; --fyi:#8a8f96; --good:#1d7a5f;
+    --band-ink:#f4f2ec; --band-sub:#c6d2dd; --band-kick:#9fb4c6;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0d141c; --paper:#131c26; --card:#17212c; --band:#0e2036;
+    --ink:#e7eef5; --slate:#a2b4c6; --faint:#7d8794; --line:#283644;
+    --band-ink:#eef4fa; --band-sub:#a9c1d6; --band-kick:#7fa0bd; --good:#4bbf95;
+  }}
+  :root[data-theme="light"]{
+    --bg:#e9e7e0; --paper:#f7f6f2; --card:#ffffff; --band:#132a43; --ink:#132a43;
+    --slate:#5a6b7d; --faint:#8a8f96; --line:#ddd8ce; --band-ink:#f4f2ec;
+    --band-sub:#c6d2dd; --band-kick:#9fb4c6; --good:#1d7a5f;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d141c; --paper:#131c26; --card:#17212c; --band:#0e2036; --ink:#e7eef5;
+    --slate:#a2b4c6; --faint:#7d8794; --line:#283644; --band-ink:#eef4fa;
+    --band-sub:#a9c1d6; --band-kick:#7fa0bd; --good:#4bbf95;
+  }
+  *{box-sizing:border-box;}
+  .wrap{font-family:"Helvetica Neue",-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    color:var(--ink); background:var(--paper); line-height:1.5; max-width:960px; margin:0 auto;
+    border:1px solid var(--line); font-variant-numeric:tabular-nums;}
+  .band{background:var(--band); color:var(--band-ink); padding:26px 34px 24px;}
+  .kick{font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--band-kick); font-weight:600; margin:0 0 9px;}
+  .band h1{font-size:25px; line-height:1.15; margin:0; font-weight:700; letter-spacing:-.01em; text-wrap:balance;}
+  .band p{margin:9px 0 0; color:var(--band-sub); font-size:13px; max-width:66ch;}
+  .badge{display:inline-block; margin-top:14px; background:#12503b; color:#d9f2e6; font-size:10.5px;
+    font-weight:700; letter-spacing:.06em; padding:5px 11px; border-radius:3px; text-transform:uppercase;}
+  .body{padding:26px 34px 32px; display:flex; flex-direction:column; gap:26px;}
+  h2{font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--slate);
+     font-weight:700; margin:0 0 13px; padding-bottom:6px; border-bottom:2px solid var(--ink);}
+  .tiles{display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line);}
+  @media (max-width:720px){.tiles{grid-template-columns:1fr 1fr;}}
+  .tile{background:var(--card); padding:16px 16px 15px;}
+  .tile .lab{font-size:11px; color:var(--slate); font-weight:600;}
+  .tile .n{font-weight:700; letter-spacing:-.02em; line-height:1; margin-top:9px;}
+  .tile .n.hero{font-size:46px; color:var(--crit);}
+  .tile .n.mid{font-size:30px;}
+  .tile .n.good{color:var(--good);}
+  .tile .sub{font-size:11px; color:var(--faint); margin-top:7px;}
+  .cols{display:grid; grid-template-columns:1.15fr 1fr; gap:26px;}
+  @media (max-width:720px){.cols{grid-template-columns:1fr;}}
+  table.cm{border-collapse:collapse; width:100%; font-size:13px;}
+  table.cm caption{caption-side:bottom; font-size:11px; color:var(--faint); text-align:left; padding-top:8px;}
+  table.cm th{font-weight:600; color:var(--slate); font-size:11px; padding:5px 6px; text-align:center;}
+  table.cm th.rowlab{text-align:right; padding-right:9px; white-space:nowrap;}
+  table.cm td{text-align:center; padding:0; border:1px solid var(--line);}
+  .cell{padding:11px 6px; font-weight:700;}
+  .corner{color:var(--faint); font-size:10px; font-weight:600; text-align:right; padding-right:9px;}
+  .sev-dot{display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; vertical-align:0;}
+  ul.find{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:11px;}
+  ul.find li{font-size:13.5px; padding-left:15px; position:relative;}
+  ul.find li::before{content:""; position:absolute; left:0; top:7px; width:6px; height:6px; border-radius:50%; background:var(--rout);}
+  ul.find li.g::before{background:var(--good);} ul.find li.w::before{background:var(--crit);}
+  .bars{display:flex; flex-direction:column; gap:9px;}
+  .barrow{display:grid; grid-template-columns:150px 1fr 60px; align-items:center; gap:10px; font-size:12.5px;}
+  .barrow .bl{color:var(--slate);}
+  .track{height:15px; background:color-mix(in srgb, var(--line) 60%, transparent); border-radius:2px; overflow:hidden;}
+  .fill{height:100%;}
+  .barrow .bv{text-align:right; font-weight:700; font-size:12px;}
+  .split2{display:grid; grid-template-columns:1fr 1fr; gap:26px;}
+  @media (max-width:720px){.split2{grid-template-columns:1fr;}}
+  .chart{background:var(--card); border:1px solid var(--line); padding:16px 18px 12px;}
+  .legend{display:flex; gap:18px; font-size:11.5px; color:var(--slate); margin-top:8px;}
+  .swatch{display:inline-block; width:16px; height:3px; margin-right:6px; vertical-align:3px; border-radius:2px;}
+  .warn{background:color-mix(in srgb,var(--urg) 12%,var(--card)); border:1px solid color-mix(in srgb,var(--urg) 30%,var(--line));
+    border-left:3px solid var(--urg); padding:13px 16px; font-size:12.5px; border-radius:4px;}
+  .limit{background:color-mix(in srgb, var(--crit) 8%, var(--card)); border:1px solid color-mix(in srgb,var(--crit) 25%, var(--line));
+    border-left:3px solid var(--crit); padding:14px 18px; border-radius:4px; font-size:13px;}
+  .limit .lh{font-weight:700; color:var(--crit); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:5px;}
+  footer{padding:16px 34px 24px; border-top:1px solid var(--line); color:var(--faint); font-size:11px; background:var(--card);}
+</style>
+
+<div class="wrap">
+  <div class="band">
+    <p class="kick">Conduit &middot; classifier &middot; experiment 2 (current best)</p>
+    <h1>Rubric-driven classifier, cost bias removed</h1>
+    <p>Held-out test set (n=280), frozen gpt-5-mini. The classifier's prompt is built live from the rubric (tier definitions, boundary rules, signals) plus labelled anchor and degraded examples. The Exp 1 cost-sensitivity nudge is removed — it over-escalated to critical.</p>
+    <span class="badge">Best config &middot; beats baseline overall accuracy</span>
+  </div>
+
+  <div class="body">
+
+    <div class="tiles">
+      <div class="tile">
+        <div class="lab">Recall on <b>critical</b> — headline</div>
+        <div class="n hero">91.1%</div>
+        <div class="sub">51 of 56 &middot; held across all experiments</div>
+      </div>
+      <div class="tile">
+        <div class="lab">Overall accuracy</div>
+        <div class="n mid good">77.1%</div>
+        <div class="sub">vs 75.0% baseline (+2.1)</div>
+      </div>
+      <div class="tile">
+        <div class="lab">insufficient-detail flag</div>
+        <div class="n mid good">100%</div>
+        <div class="sub">flags, never guesses (NFR1)</div>
+      </div>
+      <div class="tile">
+        <div class="lab">routine &rarr; urgent over-triage</div>
+        <div class="n mid good">25</div>
+        <div class="sub">was 42 at baseline</div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div>
+        <h2>Confusion matrix</h2>
+        <table class="cm">
+          <thead><tr>
+            <th class="corner">assigned &darr; / predicted &rarr;</th>
+            <th><span class="sev-dot" style="background:var(--crit)"></span>crit</th>
+            <th><span class="sev-dot" style="background:var(--urg)"></span>urg</th>
+            <th><span class="sev-dot" style="background:var(--rout)"></span>rout</th>
+            <th><span class="sev-dot" style="background:var(--fyi)"></span>fyi</th>
+          </tr></thead>
+          <tbody>
+            <tr><th class="rowlab"><span class="sev-dot" style="background:var(--crit)"></span>critical</th>
+              <td><div class="cell" style="background:rgba(29,122,95,.65)">51</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.11)">1</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.15)">4</div></td>
+              <td><div class="cell">0</div></td></tr>
+            <tr><th class="rowlab"><span class="sev-dot" style="background:var(--urg)"></span>urgent</th>
+              <td><div class="cell" style="background:rgba(180,35,42,.15)">6</div></td>
+              <td><div class="cell" style="background:rgba(29,122,95,.62)">72</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.16)">7</div></td>
+              <td><div class="cell">0</div></td></tr>
+            <tr><th class="rowlab"><span class="sev-dot" style="background:var(--rout)"></span>routine</th>
+              <td><div class="cell">0</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.31)">25</div></td>
+              <td><div class="cell" style="background:rgba(29,122,95,.47)">48</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.18)">10</div></td></tr>
+            <tr><th class="rowlab"><span class="sev-dot" style="background:var(--fyi)"></span>fyi</th>
+              <td><div class="cell" style="background:rgba(180,35,42,.11)">1</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.13)">2</div></td>
+              <td><div class="cell" style="background:rgba(180,35,42,.20)">8</div></td>
+              <td><div class="cell" style="background:rgba(29,122,95,.59)">45</div></td></tr>
+          </tbody>
+          <caption>Diagonal (teal) = correct. Residual error: 25 routine calls still escalated to urgent, and 7 urgent calls demoted to routine.</caption>
+        </table>
+      </div>
+      <div>
+        <h2>What it means</h2>
+        <ul class="find">
+          <li class="g"><b>Critical detection strong &amp; stable</b> — 91.1%; the 5 misses land as urgent/routine, never fyi.</li>
+          <li class="g"><b>Routine over-triage fixed</b> — 42 &rarr; 25; routine recall 37% &rarr; 58%. The rubric boundary rules did this.</li>
+          <li class="g"><b>Clean accuracy up to 83.2%</b>; insufficient-detail flagging perfect.</li>
+          <li class="w"><b>Residual: urgent under-triage</b> — urgent recall 84.7% (was 95.3%); 7 genuine urgents demoted to routine. This is the next target.</li>
+          <li><b>Degraded transcripts still hard</b> — 63.1% vs 83.2% clean. Prompt changes haven't moved this slice.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="split2">
+      <div>
+        <h2>Cost-weighted error &middot; 680 total</h2>
+        <div class="bars">
+          <div class="barrow"><span class="bl">Missed critical (&times;5)</span><div class="track"><div class="fill" style="width:100%;background:var(--crit)"></div></div><span class="bv">500</span></div>
+          <div class="barrow"><span class="bl">Missed urgent (&times;7)</span><div class="track"><div class="fill" style="width:28%;background:var(--urg)"></div></div><span class="bv">140</span></div>
+          <div class="barrow"><span class="bl">Unnecessary interrupt (&times;28)</span><div class="track"><div class="fill" style="width:5.6%;background:var(--rout)"></div></div><span class="bv">28</span></div>
+          <div class="barrow"><span class="bl">Over-triage one tier (&times;24)</span><div class="track"><div class="fill" style="width:2.4%;background:var(--faint)"></div></div><span class="bv">12</span></div>
+        </div>
+        <div class="warn" style="margin-top:12px;"><b>Placeholder costs</b> (N4). Cost is up vs baseline (633 &rarr; 680) because the 7 urgent&rarr;routine demotions are expensive (&times;20) — the tradeoff for fixing routine over-triage.</div>
+      </div>
+      <div>
+        <h2>Clean vs degraded</h2>
+        <div class="bars">
+          <div class="barrow"><span class="bl">Clean (n=196)</span><div class="track"><div class="fill" style="width:83.2%;background:var(--good)"></div></div><span class="bv">83.2%</span></div>
+          <div class="barrow"><span class="bl">Degraded (n=84)</span><div class="track"><div class="fill" style="width:63.1%;background:var(--urg)"></div></div><span class="bv">63.1%</span></div>
+        </div>
+        <p style="font-size:12.5px;color:var(--slate);margin:12px 0 0;">Real voicemail transcripts look like the degraded set. The 20-point gap is the honest read on field performance and the biggest untouched lever — a next-experiment target (ASR normalization).</p>
+      </div>
+    </div>
+
+    <div>
+      <h2>Threshold sweep — the operating-point curve</h2>
+      <div class="chart">
+        <svg viewBox="0 0 620 178" role="img" aria-label="As the auto-route confidence cutoff rises, missed-urgent and unnecessary-interrupt counts fall.">
+          <g stroke="var(--line)" stroke-width="1">
+            <line x1="46" y1="20" x2="600" y2="20"/><line x1="46" y1="63" x2="600" y2="63"/>
+            <line x1="46" y1="106" x2="600" y2="106"/><line x1="46" y1="149" x2="600" y2="149"/>
+          </g>
+          <g font-size="10" fill="var(--faint)" text-anchor="end" font-family="Helvetica Neue,Arial,sans-serif">
+            <text x="40" y="23">30</text><text x="40" y="66">20</text><text x="40" y="109">10</text><text x="40" y="152">0</text>
+          </g>
+          <polyline fill="none" stroke="var(--rout)" stroke-width="2.5" stroke-linejoin="round"
+            points="46,28.6 212,28.6 268,37.2 323,45.8 378,50.1 434,54.4 489,54.4 545,123.2 600,149"/>
+          <polyline fill="none" stroke="var(--crit)" stroke-width="2.5" stroke-linejoin="round"
+            points="46,101.7 212,114.6 268,118.9 323,127.5 378,140.4 434,140.4 489,149 545,149 600,149"/>
+          <g font-size="10" fill="var(--faint)" text-anchor="middle" font-family="Helvetica Neue,Arial,sans-serif">
+            <text x="46" y="167">0.0</text><text x="323" y="167">0.5 &middot; confidence cutoff</text><text x="600" y="167">1.0</text>
+          </g>
+        </svg>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--rout)"></span>unnecessary interrupts (auto-routed)</span>
+          <span><span class="swatch" style="background:var(--crit)"></span>missed urgent (auto-routed)</span>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--slate);margin:10px 0 0;">A cutoff near <b>0.8</b> drives missed-urgent among auto-routed calls to <b>zero</b> (flagging the rest for review) — the mechanism that would catch exactly the 7 urgent&rarr;routine demotions. Not yet wired into the live system.</p>
+    </div>
+
+    <div class="limit">
+      <div class="lh">Limitation</div>
+      Generator and classifier share a model family, so these synthetic results <b>validate the pipeline and tune the prompt; they do not establish real-world accuracy.</b> Human-vs-assigned label agreement is 77.5% — some "errors" may be label disagreements. Rubric §1 awaits partner-physician sign-off; cost values are placeholders (N4).
+    </div>
+
+  </div>
+
+  <footer>
+    Experiment 2 (`feat/exp-drop-cost-bias`): rubric-driven prompt + anchor/fewshot examples, cost bias removed. Held-out test n=280; frozen gpt-5-mini. See docs/EXPERIMENTS.md for the full baseline &rarr; all-assets &rarr; no-cost-bias progression.
+  </footer>
+</div>
