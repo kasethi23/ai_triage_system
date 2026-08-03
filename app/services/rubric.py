@@ -69,6 +69,21 @@ def boundary_rules() -> str:
     return " ".join(parts)
 
 
+def no_callback_rule() -> str:
+    """§3 — when `no_callback` is true."""
+    return _clean(_section("3"))
+
+
+def insufficient_detail_rule() -> str:
+    """§4 — the minimum-information-set rule for `insufficient_detail`."""
+    return _clean(_section("4"))
+
+
+def request_type_defs() -> str:
+    """§5 — request-type definitions, including operational-vs-other."""
+    return _clean(_section("5"))
+
+
 def signals_not_to_use() -> str:
     """§6 — signals that must not influence severity."""
     return _clean(_section("6"))

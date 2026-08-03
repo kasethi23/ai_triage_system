@@ -1,5 +1,7 @@
 import copy
 import json
+from collections import defaultdict
+from pathlib import Path
 
 from openai import OpenAI
 
@@ -13,6 +15,13 @@ from app.config import (
 from app.services import rubric as _rubric
 
 _client = OpenAI(api_key=OPENAI_API_KEY)
+
+_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+_COSTS_PATH = _DATA_DIR / "costs.yaml"
+# The generated fewshot split is built specifically for prompt injection
+# (make_splits.py) and is disjoint from the test split by construction.
+_SPLIT_FEWSHOT_PATH = _DATA_DIR / "splits" / "fewshot.jsonl"
+_SPLIT_FEWSHOT_PER_TIER = 3
 
 # Maps the single LLM-produced severity label onto the legacy `urgency` enum,
 # which is kept only for requirements traceability (FR2). The model is no longer
@@ -161,7 +170,32 @@ def _system_prompt() -> str:
     signals = _rubric.signals_not_to_use()
     if signals:
         prompt += " Signals that must NOT influence the severity decision: " + signals
+    cost = _cost_bias()
+    if cost:
+        prompt += " " + cost
     return prompt
+
+
+def _cost_bias() -> str:
+    """Communicate the asymmetric cost matrix (data/costs.yaml) to the model, so
+    it errs toward higher acuity when genuinely uncertain — the same cost-sensitive
+    framing the offline evaluator uses. Empty string if costs are unavailable."""
+    try:
+        import yaml
+
+        costs = yaml.safe_load(_COSTS_PATH.read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001 — best effort; classifier still works without it
+        return ""
+    missed = costs.get("missed_critical")
+    interrupt = costs.get("unnecessary_interrupt")
+    if not missed or not interrupt:
+        return ""
+    ratio = int(round(missed / interrupt))
+    return (
+        f"Errors are not equally costly: missing a critical call is roughly {ratio}x "
+        "as costly as an unnecessary interruption. When you are genuinely uncertain "
+        "between two adjacent severity tiers, prefer the higher-acuity tier."
+    )
 
 
 def _severity_description() -> str:
@@ -184,8 +218,53 @@ def _severity_description() -> str:
 
 def _response_schema() -> dict:
     schema = copy.deepcopy(_RESPONSE_SCHEMA_TEMPLATE)
-    schema["json_schema"]["schema"]["properties"]["severity"]["description"] = _severity_description()
+    props = schema["json_schema"]["schema"]["properties"]
+    props["severity"]["description"] = _severity_description()
+    # §3/§4/§5 drive the flag + request_type field descriptions live too, so the
+    # whole classification is rubric-controlled (fall back to the template text
+    # when a section is empty).
+    if _rubric.no_callback_rule():
+        props["no_callback"]["description"] = _rubric.no_callback_rule()
+    if _rubric.insufficient_detail_rule():
+        props["insufficient_detail"]["description"] = _rubric.insufficient_detail_rule()
+    if _rubric.request_type_defs():
+        props["request_type"]["description"] = _rubric.request_type_defs()
     return schema
+
+
+def _split_fewshot() -> list[dict]:
+    """Inject the generated fewshot split as labelled worked examples. Unlike the
+    rubric anchors (all clean), these include degraded/realistic messages — the
+    slice the classifier is weakest on. Leakage-safe: disjoint from test by
+    construction (make_splits.py)."""
+    if not _SPLIT_FEWSHOT_PATH.exists():
+        return []
+    by_tier: dict[str, list[dict]] = defaultdict(list)
+    with open(_SPLIT_FEWSHOT_PATH, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                rec = json.loads(line)
+                by_tier[rec.get("assigned_severity")].append(rec)
+    pairs: list[dict] = []
+    for tier in ("critical", "urgent", "routine", "fyi"):
+        for rec in by_tier.get(tier, [])[:_SPLIT_FEWSHOT_PER_TIER]:
+            label = {
+                "severity": rec.get("assigned_severity"),
+                "request_type": rec.get("assigned_request_type"),
+                "no_callback": bool(rec.get("assigned_no_callback", False)),
+                "insufficient_detail": bool(rec.get("assigned_insufficient_detail", False)),
+            }
+            pairs.append({"role": "user", "content": f"Transcript:\n\n{rec.get('transcript', '')}"})
+            pairs.append({"role": "assistant", "content": json.dumps(label)})
+    if not pairs:
+        return []
+    return [
+        {
+            "role": "system",
+            "content": "Additional labelled examples, including degraded/realistic messages:",
+        }
+    ] + pairs
 
 
 def _rubric_fewshot() -> list[dict]:
@@ -264,6 +343,7 @@ def classify_transcript(transcript: str) -> dict:
     """
     messages = [{"role": "system", "content": _system_prompt()}]
     messages.extend(_rubric_fewshot())       # §2 anchor examples (rubric)
+    messages.extend(_split_fewshot())        # generated fewshot split (incl. degraded)
     messages.extend(_fewshot_messages())     # physician corrections (Task 12)
     messages.append({"role": "user", "content": f"Transcript:\n\n{transcript}"})
 
