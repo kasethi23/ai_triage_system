@@ -15,7 +15,7 @@ weights. All runs use the same held-out test split (n=280) and corpus.
 |---|---|---|---|---|---|---|---|---|---|
 | 0 | Baseline — plain prompt (condensed §1 only) | `main` | 91.1% | 75.0% | 42 | 95.5% | 95.3% | 63.1% | reference |
 | 1 | + rubric §1–§6, anchors, fewshot split, cost bias | `feat/rubric-driven-classifier` | 91.1% | 73.6% | **26** | **100%** | 77.6% | 59.5% | **mixed** |
-| 2 | Exp 1 minus the cost bias | `feat/exp-drop-cost-bias` | _pending_ | | | | | | |
+| 2 | Exp 1 minus the cost bias | `feat/exp-drop-cost-bias` | 91.1% | **77.1%** | **25** | 100% | 84.7% | 63.1% | **keep ✓** |
 
 Lower is better for **routine→urgent** (over-triage count); higher is better for
 everything else.
@@ -54,4 +54,18 @@ Hypothesis: removing the "err toward higher acuity" instruction recovers the
 urgent tier and overall accuracy while keeping the routine + insufficient_detail
 wins from the rubric rules and examples.
 
-_Running…_
+**Result: confirmed — best config so far. Keep.**
+- ✅ **Overall accuracy 77.1%** — beats the baseline (75.0%) and Exp 1 (73.6%).
+- ✅ Critical recall held at 91.1%; routine over-triage 42 → **25** (routine recall 37.3% → 57.8%); insufficient_detail 100%; clean accuracy 80.1% → **83.2%**.
+- ✅ Urgent tier recovered: 77.6% → 84.7% (the cost-bias over-escalation is gone).
+- ✗ **Residual: urgent recall 84.7% is still below baseline (95.3%)** — the strict rubric now demotes **7 genuine urgents to routine**, so the cost-weighted error is up (633 → 680), driven by missed-urgent (×20). We traded routine over-triage for a little urgent under-triage.
+
+**Net vs baseline:** better overall accuracy and routine/insufficient-detail; worse on the urgent-vs-routine boundary. Keep this config; the next target is urgent recall.
+
+## Experiment 3 — next targets (planned)
+
+Attack the urgent-vs-routine boundary and the critical misses:
+- Error-analyze the **5 missed criticals** (same across all runs — prompt text hasn't touched them) and the **7 urgent→routine** demotions.
+- Sharpen §2.1 urgent-vs-routine wording; add urgent boundary examples (only 2 today).
+- Wire **confidence-gated review** so the borderline urgent/routine calls are flagged, not silently mis-routed.
+- Consider a **degraded-transcript normalizer** (invert degrade.py's ASR map) — degraded accuracy is flat at 63.1%.
