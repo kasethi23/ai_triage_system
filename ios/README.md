@@ -104,7 +104,7 @@ Tap **Allow** on the notification-permission prompt at first launch.
      "aps": {
        "alert": {"title": "CRITICAL: Mr. Reeves", "body": "412 — Chest pain, needs callback now"},
        "sound": "default", "badge": 1,
-       "thread-id": "severity-severe", "interruption-level": "time-sensitive"
+       "thread-id": "severity-critical", "interruption-level": "time-sensitive"
      },
      "call_id": 3
    }

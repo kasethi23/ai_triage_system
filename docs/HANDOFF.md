@@ -19,9 +19,11 @@ Both major specs are **implemented and merged to `main`**:
 The parallel **iOS app branch was reconciled** onto the main backend, and the
 severity enum was standardised everywhere.
 
-Headline evaluation result: **91.1% recall on `critical`** calls, inter-rater
-**Cohen's κ = 0.966**. (Synthetic data — validates the pipeline, not real-world
-accuracy; see caveats.)
+Headline evaluation result: **98.1% recall on triageable `critical`** calls
+(91.1% across all records, incl. un-triageable degraded fragments), inter-rater
+**Cohen's κ = 0.966**. The classifier is **not trained** — it builds its prompt
+live from `data/rubric.md`, so editing the rubric changes classifications. (Synthetic
+data — validates the pipeline, not real-world accuracy; see caveats.)
 
 ---
 
@@ -70,6 +72,22 @@ everything decided during this build-out, so the reasoning is captured in one pl
   Physician corrections are stored, then **human-approved** promotion adds them to a
   runtime few-shot pool; a promoted example is permanently disqualified from the
   eval test set (leakage guard).
+- **The classifier is NOT trained** — `gpt-5-mini` is frozen. "train/dev/test" is
+  borrowed vocabulary: the `fewshot` split is **in-context examples pasted into the
+  prompt** (a cheat-sheet, shredded after each call), `dev` is where we iterate, and
+  `test` is the honest held-out score. Fine-tuning (real weight training) waits for
+  real clinician-labelled data (synthetic + shared model family would bake in the
+  generator's blind spots).
+- **The rubric drives the classifier live** (`app/services/rubric.py`): §1 tier
+  definitions + §2.1 boundary rules → the severity schema description, §3/§4/§5 → the
+  flag/request-type descriptions, §6 → the system prompt, §2 anchors → few-shot
+  examples. **Editing `data/rubric.md` changes classifications** — single source of
+  truth, no hand-copied constant. Verified: flipping one boundary rule flips a label.
+- **Cost-sensitivity as a prompt nudge was tried and rejected** (Exp 1): telling the
+  model to "err toward higher acuity" over-escalated borderline calls to critical
+  without catching any real ones. Removed. The cost matrix governs *evaluation* only;
+  the right place for cost-sensitivity at runtime is a confidence-gated review, not
+  a global prompt nudge.
 - **Scope is electrophysiology only** (not broad cardiology) — consistent with the
   partner's anchors, specialty, and the measured metadata.
 
@@ -204,20 +222,46 @@ the new severity enum. **Needs a Mac + Xcode to build.**
 
 ## Evaluation results (synthetic, `gpt-5-mini`, 280-record test set)
 
-- **Recall on `critical`: 91.1%** (51/56) — the headline safety metric.
-- Overall accuracy 75.0%. Main error = **routine → urgent over-triage** (the model
-  escalates when unsure — the "safe" direction for a triage tool).
-- `insufficient_detail` flag rate **95.5%** (flags rather than guesses — NFR1).
-- Clean transcripts **80.1%** vs degraded **63.1%** — realistic ASR noise costs 17
-  points; the most informative slice.
-- Cost-weighted error dominated by the 5 missed criticals (asymmetric by design).
-- Inter-rater **Cohen's κ = 0.966**; human-vs-generator agreement 77.5%.
+Current best config: rubric-driven prompt + labelled examples, no cost bias, severity
+scored on the **triageable subset**.
 
-A visual version is in `docs/evaluation_design_review.html` (open in a browser).
+- **Recall on `critical`: 98.1%** (51/52) on triageable calls — the headline safety
+  metric. (91.1% across all 280 including un-triageable degraded fragments.)
+- Overall accuracy 77.5% (triageable). `insufficient_detail` flag rate **100%**.
+- Clean **79.1%** vs degraded **72.6%** (triageable) — realistic ASR noise still costs
+  points, but far less than the 63% the un-triageable fragments made it look.
+- Inter-rater **Cohen's κ = 0.966**; human-vs-generator agreement 77.5% (the ceiling —
+  ~1 in 5 "correct" labels are debatable).
 
-> **Limitation (state this in the report):** the generator and classifier share a
-> model family, so these numbers validate the pipeline and tune the threshold —
-> they do **not** establish real-world accuracy.
+### How we got here — the experiment arc (`docs/EXPERIMENTS.md`)
+The evaluation harness drove every decision, including catching a regression and a
+scoring bug intuition would have missed. That progression is itself a deliverable:
+
+0. **baseline** — plain prompt: 91.1% / 75.0%, main error routine→urgent over-triage (42).
+1. **feed the assets in** (rubric rules, anchors, fewshot, cost bias): fixed the
+   over-triage (42→26) but the **cost bias backfired** (over-escalated to critical) —
+   *mixed*.
+2. **drop the cost bias**: best config — beats baseline overall accuracy, over-triage
+   fixed, critical recall held.
+3. **error analysis**: the "missed criticals" were **truncated un-triageable fragments**
+   the model correctly flagged — a *measurement* artifact, not a model weakness.
+4. **fix the measurement** (score severity on triageable calls only): honest critical
+   recall 91.1%→**98.1%**, cost-weighted ~680→**202**, degraded 62%→73%.
+
+**Design-decision meta-lesson for the report:** targeted rules (rubric boundary rules)
+helped; a global prompt nudge (cost bias) hurt; and the biggest "improvement" was a
+*measurement* fix, not a model change. Next planned: **confidence-gated review** (wire
+the flag-for-review the threshold sweep justifies) and **label adjudication** (raise the
+77.5% ceiling).
+
+Visual dashboards (open in a browser / see the artifact links): baseline design-review,
+before/after (Exp 0 vs 1), Exp 2 best config, and Exp 4 measurement fix —
+`docs/evaluation_*.html`.
+
+> **Limitation (state this in the report):** the classifier is a frozen prompt (no
+> training); the generator and classifier share a model family, so these numbers
+> validate the pipeline and tune the prompt — they do **not** establish real-world
+> accuracy.
 
 ---
 
