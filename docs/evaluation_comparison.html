@@ -1,0 +1,163 @@
+<title>Conduit — Classifier Evaluation: before vs after</title>
+<style>
+  :root{
+    --bg:#e9e7e0; --paper:#f7f6f2; --card:#ffffff; --band:#132a43;
+    --ink:#132a43; --slate:#5a6b7d; --faint:#8a8f96; --line:#ddd8ce;
+    --crit:#b4232a; --urg:#bd7b18; --rout:#2f6d8c; --fyi:#8a8f96;
+    --good:#1d7a5f; --bad:#b4232a;
+    --band-ink:#f4f2ec; --band-sub:#c6d2dd; --band-kick:#9fb4c6;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0d141c; --paper:#131c26; --card:#17212c; --band:#0e2036;
+    --ink:#e7eef5; --slate:#a2b4c6; --faint:#7d8794; --line:#283644;
+    --band-ink:#eef4fa; --band-sub:#a9c1d6; --band-kick:#7fa0bd; --good:#4bbf95;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0d141c; --paper:#131c26; --card:#17212c; --band:#0e2036;
+    --ink:#e7eef5; --slate:#a2b4c6; --faint:#7d8794; --line:#283644;
+    --band-ink:#eef4fa; --band-sub:#a9c1d6; --band-kick:#7fa0bd; --good:#4bbf95;
+  }
+  :root[data-theme="light"]{
+    --bg:#e9e7e0; --paper:#f7f6f2; --card:#ffffff; --band:#132a43;
+    --ink:#132a43; --slate:#5a6b7d; --faint:#8a8f96; --line:#ddd8ce;
+    --band-ink:#f4f2ec; --band-sub:#c6d2dd; --band-kick:#9fb4c6; --good:#1d7a5f;
+  }
+  *{box-sizing:border-box;}
+  .wrap{font-family:"Helvetica Neue",-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    color:var(--ink); background:var(--paper); line-height:1.5; max-width:960px; margin:0 auto;
+    border:1px solid var(--line); font-variant-numeric:tabular-nums;}
+  .band{background:var(--band); color:var(--band-ink); padding:26px 34px 24px;}
+  .kick{font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--band-kick); font-weight:600; margin:0 0 9px;}
+  .band h1{font-size:24px; line-height:1.15; margin:0; font-weight:700; letter-spacing:-.01em; text-wrap:balance;}
+  .band p{margin:9px 0 0; color:var(--band-sub); font-size:13px; max-width:70ch;}
+  .body{padding:24px 34px 30px; display:flex; flex-direction:column; gap:24px;}
+  h2{font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--slate);
+     font-weight:700; margin:0 0 13px; padding-bottom:6px; border-bottom:2px solid var(--ink);}
+  /* tiles */
+  .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line);}
+  @media (max-width:760px){.tiles{grid-template-columns:1fr 1fr;}}
+  .tile{background:var(--card); padding:15px 15px 14px;}
+  .tile .lab{font-size:11px; color:var(--slate); font-weight:600; min-height:28px;}
+  .tile .val{font-size:15px; margin-top:8px;}
+  .tile .b{color:var(--faint);}
+  .tile .arrow{color:var(--faint); margin:0 5px;}
+  .tile .a{font-weight:700; font-size:22px;}
+  .tile .d{display:inline-block; margin-top:7px; font-size:11.5px; font-weight:700; padding:2px 7px; border-radius:10px;}
+  .d.good{color:var(--good); background:color-mix(in srgb, var(--good) 14%, transparent);}
+  .d.bad{color:var(--bad); background:color-mix(in srgb, var(--bad) 12%, transparent);}
+  .d.flat{color:var(--slate); background:color-mix(in srgb, var(--slate) 12%, transparent);}
+  /* per-tier recall bars */
+  .rows{display:flex; flex-direction:column; gap:12px;}
+  .row{display:grid; grid-template-columns:70px 1fr; gap:12px; align-items:center;}
+  .row .name{font-size:13px; font-weight:600;}
+  .pair{display:flex; flex-direction:column; gap:5px;}
+  .track{position:relative; height:16px; background:color-mix(in srgb,var(--line) 55%, transparent); border-radius:3px;}
+  .track .fill{position:absolute; left:0; top:0; height:100%; border-radius:3px;}
+  .track .tag{position:absolute; right:6px; top:0; font-size:10.5px; line-height:16px; font-weight:700; color:var(--ink);}
+  .track .lead{position:absolute; left:6px; top:0; font-size:10px; line-height:16px; color:var(--faint); font-weight:600;}
+  /* callouts */
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:22px;}
+  @media (max-width:760px){.two{grid-template-columns:1fr;}}
+  ul.pts{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:9px;}
+  ul.pts li{font-size:13px; padding-left:16px; position:relative;}
+  ul.pts li::before{content:""; position:absolute; left:0; top:7px; width:7px; height:7px; border-radius:2px;}
+  ul.pts.win li::before{background:var(--good);}
+  ul.pts.reg li::before{background:var(--bad);}
+  .takeaway{background:color-mix(in srgb, var(--rout) 8%, var(--card));
+    border:1px solid color-mix(in srgb,var(--rout) 25%, var(--line)); border-left:3px solid var(--rout);
+    padding:14px 18px; border-radius:4px; font-size:13.5px;}
+  .takeaway b{color:var(--ink);}
+  footer{padding:15px 34px 22px; border-top:1px solid var(--line); color:var(--faint); font-size:11px; background:var(--card);}
+</style>
+
+<div class="wrap">
+  <div class="band">
+    <p class="kick">Conduit &middot; classifier &middot; before vs after</p>
+    <h1>Does feeding the rubric, examples, and cost matrix into the prompt help?</h1>
+    <p>Same 280-record held-out test set, same frozen gpt-5-mini. "Before" = a plain system prompt. "After" = the rubric's tier definitions, boundary rules, and signals + labelled anchor and degraded examples + a cost-sensitivity instruction, all injected into the prompt.</p>
+  </div>
+
+  <div class="body">
+
+    <div class="tiles">
+      <div class="tile">
+        <div class="lab">Recall on <b>critical</b> (headline)</div>
+        <div class="val"><span class="b">91.1%</span><span class="arrow">&rarr;</span><span class="a">91.1%</span></div>
+        <div class="d flat">no change</div>
+      </div>
+      <div class="tile">
+        <div class="lab">routine &rarr; urgent over-triage</div>
+        <div class="val"><span class="b">42</span><span class="arrow">&rarr;</span><span class="a">26</span></div>
+        <div class="d good">&minus;16 fixed</div>
+      </div>
+      <div class="tile">
+        <div class="lab">insufficient-detail flag rate</div>
+        <div class="val"><span class="b">95.5%</span><span class="arrow">&rarr;</span><span class="a">100%</span></div>
+        <div class="d good">+4.5 perfect</div>
+      </div>
+      <div class="tile">
+        <div class="lab">Overall accuracy</div>
+        <div class="val"><span class="b">75.0%</span><span class="arrow">&rarr;</span><span class="a">73.6%</span></div>
+        <div class="d bad">&minus;1.4</div>
+      </div>
+    </div>
+
+    <div>
+      <h2>Per-tier recall — before (faint) vs after (solid)</h2>
+      <div class="rows">
+        <div class="row"><span class="name" style="color:var(--crit)">critical</span>
+          <div class="pair">
+            <div class="track"><div class="fill" style="width:91.1%;background:color-mix(in srgb,var(--crit) 35%,transparent)"></div><span class="lead">before 91.1%</span></div>
+            <div class="track"><div class="fill" style="width:91.1%;background:var(--crit)"></div><span class="tag" style="color:#fff">after 91.1%</span></div>
+          </div>
+        </div>
+        <div class="row"><span class="name" style="color:var(--urg)">urgent</span>
+          <div class="pair">
+            <div class="track"><div class="fill" style="width:95.3%;background:color-mix(in srgb,var(--urg) 35%,transparent)"></div><span class="lead">before 95.3%</span></div>
+            <div class="track"><div class="fill" style="width:77.6%;background:var(--urg)"></div><span class="tag" style="color:#fff">after 77.6% &darr;</span></div>
+          </div>
+        </div>
+        <div class="row"><span class="name" style="color:var(--rout)">routine</span>
+          <div class="pair">
+            <div class="track"><div class="fill" style="width:37.3%;background:color-mix(in srgb,var(--rout) 35%,transparent)"></div><span class="lead">before 37.3%</span></div>
+            <div class="track"><div class="fill" style="width:54.2%;background:var(--rout)"></div><span class="tag" style="color:#fff">after 54.2% &uarr;</span></div>
+          </div>
+        </div>
+        <div class="row"><span class="name" style="color:var(--fyi)">fyi</span>
+          <div class="pair">
+            <div class="track"><div class="fill" style="width:83.9%;background:color-mix(in srgb,var(--fyi) 40%,transparent)"></div><span class="lead">before 83.9%</span></div>
+            <div class="track"><div class="fill" style="width:78.6%;background:var(--fyi)"></div><span class="tag" style="color:#fff">after 78.6%</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="two">
+      <div>
+        <h2>What improved</h2>
+        <ul class="pts win">
+          <li><b>routine over-triage cut sharply</b> — 42 → 26 routine calls wrongly escalated to urgent (routine recall +17 pts). The rubric boundary rules did their job.</li>
+          <li><b>insufficient-detail now perfect</b> — 100% flagged, 0 guessed (was 95.5%). §4's minimum-information-set rule + degraded examples.</li>
+          <li><b>unnecessary interrupts down</b> — 45 → 33.</li>
+        </ul>
+      </div>
+      <div>
+        <h2>What regressed</h2>
+        <ul class="pts reg">
+          <li><b>The cost bias over-escalated</b> — "err toward higher acuity" pushed ~19 borderline calls (14 urgent, 4 fyi, 2 routine) up to critical, <b>without catching one extra true critical</b> (recall stayed 91.1%).</li>
+          <li><b>urgent tier destabilised</b> — recall 95.3% → 77.6%.</li>
+          <li>Overall accuracy &minus;1.4; cost-weighted error 633 → 649.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="takeaway">
+      <b>Takeaway.</b> Feeding the assets in helped where they were <b>specific</b> (boundary rules → routine; §4 → insufficient-detail) and hurt where the nudge was <b>global</b> (the cost bias → over-escalation to critical). This tradeoff is invisible to intuition — it looks like an obvious win — and is only visible because the evaluation harness measured it. <b>Recommendation:</b> drop the cost bias, keep the rubric rules + labelled examples, and re-run to confirm a cleaner result.
+    </div>
+
+  </div>
+
+  <footer>
+    Held-out test n=280; frozen gpt-5-mini; identical corpus and split. Synthetic data — validates the pipeline and tunes the prompt, does not establish real-world accuracy (generator and classifier share a model family). Cost values in data/costs.yaml are placeholders (N4).
+  </footer>
+</div>
