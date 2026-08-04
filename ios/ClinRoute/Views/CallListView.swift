@@ -29,7 +29,16 @@ struct CallListView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .refreshable { await store.refresh() }
-        .task { await store.refresh() }
+        .task {
+            // Silent poll: refresh immediately, then every 10 s while the view
+            // is on screen (.task cancels the loop when it disappears).
+            await store.refresh()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { break }
+                await store.refresh()
+            }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 Task { await store.refresh() }
@@ -70,10 +79,13 @@ struct CallListView: View {
         }
         let critical = store.criticalGroup.count
         let urgent = store.urgentGroup.count
-        let open = critical + urgent + store.laterGroup.count
-        let oldest = (store.criticalGroup.first ?? store.urgentGroup.first ?? store.laterGroup.first)?
+        let review = store.needsReviewGroup.count
+        let open = critical + urgent + review + store.laterGroup.count
+        let oldest = (store.criticalGroup.first ?? store.urgentGroup.first
+                      ?? store.needsReviewGroup.first ?? store.laterGroup.first)?
             .arrivalClock
         var line = "\(critical) critical · \(urgent) urgent · \(open) open"
+        if review > 0 { line += " · \(review) to review" }
         if let oldest { line += ", oldest \(oldest)" }
         return line
     }
@@ -106,6 +118,15 @@ struct CallListView: View {
                     note: "this shift"
                 )
             }
+            if !store.needsReviewGroup.isEmpty {
+                GroupCard(
+                    style: .review,
+                    calls: store.needsReviewGroup,
+                    icon: "questionmark.circle",
+                    title: "Needs review",
+                    note: "insufficient info"
+                )
+            }
             if !store.laterGroup.isEmpty {
                 GroupCard(
                     style: .later,
@@ -115,7 +136,8 @@ struct CallListView: View {
                     note: "\(store.laterGroup.count) waiting"
                 )
             }
-            if store.alertingCount == 0 && store.laterGroup.isEmpty && store.lastError == nil {
+            if store.alertingCount == 0 && store.laterGroup.isEmpty
+                && store.needsReviewGroup.isEmpty && store.lastError == nil {
                 Text("Nothing unresolved.")
                     .font(Organic.body(14))
                     .foregroundStyle(Organic.neutral600)
@@ -194,7 +216,7 @@ struct CallListView: View {
 // MARK: - Group card
 
 struct GroupCard: View {
-    enum Style { case critical, urgent, later }
+    enum Style { case critical, urgent, review, later }
 
     let style: Style
     let calls: [Call]
@@ -233,6 +255,7 @@ struct GroupCard: View {
         switch style {
         case .critical: Organic.accent100
         case .urgent: Organic.bg
+        case .review: Organic.bg
         case .later: Organic.neutral100
         }
     }
@@ -264,12 +287,32 @@ struct GroupCard: View {
         switch style {
         case .critical: Organic.bg
         case .urgent: Organic.accent800
+        case .review: Organic.neutral700
         case .later: Organic.neutral700
         }
     }
 }
 
 // MARK: - Rows
+
+/// Chip shown when the classifier flagged the transcript as lacking the
+/// information needed to triage (`insufficient_detail`) — the severity is a
+/// best guess and the call needs human review.
+struct NeedsReviewBadge: View {
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 9, weight: .bold))
+            Text("NEEDS REVIEW")
+                .font(Organic.body(9.5, weight: .bold))
+                .tracking(0.5)
+        }
+        .foregroundStyle(Organic.accent800)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(Organic.accent700.opacity(0.12), in: Capsule())
+    }
+}
 
 /// Full row anatomy for Critical and Urgent groups.
 struct CallRow: View {
@@ -289,6 +332,9 @@ struct CallRow: View {
                             .font(Organic.body(13))
                             .foregroundStyle(Organic.neutral600)
                     }
+                    if call.insufficientDetail {
+                        NeedsReviewBadge()
+                    }
                     Spacer()
                 }
                 Text(call.summary)
@@ -306,7 +352,11 @@ struct CallRow: View {
     }
 
     private var timeColor: Color {
-        style == .critical ? Organic.accent700 : Organic.accent600
+        switch style {
+        case .critical: Organic.accent700
+        case .urgent: Organic.accent600
+        case .review, .later: Organic.neutral500
+        }
     }
 
     private var callerLine: String {
@@ -324,9 +374,14 @@ struct CondensedRow: View {
         HStack(alignment: .center, spacing: Organic.space3) {
             TimeColumn(call: call, color: Organic.neutral500)
             VStack(alignment: .leading, spacing: 2) {
-                Text(call.patientName)
-                    .font(Organic.body(15, weight: .bold))
-                    .foregroundStyle(Organic.text)
+                HStack(spacing: 6) {
+                    Text(call.patientName)
+                        .font(Organic.body(15, weight: .bold))
+                        .foregroundStyle(Organic.text)
+                    if call.insufficientDetail {
+                        NeedsReviewBadge()
+                    }
+                }
                 Text(call.summary)
                     .font(Organic.body(13.5))
                     .foregroundStyle(Organic.neutral700)

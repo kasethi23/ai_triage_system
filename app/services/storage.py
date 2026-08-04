@@ -72,16 +72,26 @@ def _classify_and_store(
     db.commit()
     db.refresh(call)
 
-    # Identifiers go in their own table, joined on call id.
+    # Identifiers go in their own table, joined on call id. With redaction on,
+    # the classifier saw tokens ([PERSON_1]…) and echoes them back in its
+    # identifier fields — substitute the originals so this table holds the
+    # real values the authorised path (P7) is meant to reveal.
+    def _restore(value: str) -> str:
+        if not (value and token_map):
+            return value
+        from app.services.deident import reidentify as _reidentify
+
+        return _reidentify(value, token_map)
+
     db.add(
         CallIdentifiers(
             call_id=call.id,
-            patient_name=classification.get("patient_name", "Unknown"),
+            patient_name=_restore(classification.get("patient_name", "Unknown")),
             # Room comes from structured intake (keypad, P5) when available,
             # otherwise from the classifier.
-            room=known_room or classification.get("room", ""),
-            caller_name=classification.get("caller_name", ""),
-            caller_role=classification.get("caller_role", ""),
+            room=known_room or _restore(classification.get("room", "")),
+            caller_name=_restore(classification.get("caller_name", "")),
+            caller_role=_restore(classification.get("caller_role", "")),
             token_map_json=json.dumps(token_map),
         )
     )

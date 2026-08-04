@@ -27,7 +27,10 @@ def _public_url(request: Request) -> str:
     proto = request.headers.get("x-forwarded-proto")
     host = request.headers.get("x-forwarded-host") or request.headers.get("host")
     if proto and host:
-        return f"{proto}://{host}{request.url.path}"
+        path = request.url.path
+        if request.url.query:
+            path += f"?{request.url.query}"
+        return f"{proto}://{host}{path}"
     return str(request.url)
 
 
@@ -70,7 +73,7 @@ router = APIRouter(
 # single natural voicemail; the name in it is handled by redaction (P6).
 ROOM_PROMPT = (
     "Using your keypad, enter the patient's bed or room number, then press pound. "
-    "If there is no room number, or this is an emergency, press star to skip."
+    "If there is no room number, or this is an emergency, press pound to skip."
 )
 NARRATIVE_PROMPT = (
     "Now leave your message for the physician. Include your name, your role, "
@@ -83,12 +86,16 @@ NARRATIVE_PROMPT = (
 async def incoming_call() -> Response:
     """Twilio webhook for an incoming call. Step 1: capture the room by keypad."""
     response = VoiceResponse()
+    # `#` doubles as the skip key: pressing it with no digits submits
+    # immediately with empty Digits (Twilio's finishOnKey allows only one
+    # character, and a non-terminator like `*` would sit through the full
+    # inter-digit timeout before advancing).
     gather = Gather(
         num_digits=6,
         finish_on_key="#",
         action="/voice/narrative",
         method="POST",
-        timeout=8,
+        timeout=5,
     )
     gather.say(ROOM_PROMPT)
     response.append(gather)

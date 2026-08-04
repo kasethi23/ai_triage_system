@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
@@ -83,6 +85,10 @@ def get_call_audio(call_id: int) -> FileResponse:
 
     if call is None:
         raise HTTPException(status_code=404, detail="Call not found")
+    # audio_path is cleared when RETAIN_AUDIO is off (privacy P8) — the
+    # recording no longer exists, so this is a 404, not a server error.
+    if not call.audio_path or not Path(call.audio_path).is_file():
+        raise HTTPException(status_code=404, detail="No audio retained for this call")
 
     return FileResponse(call.audio_path)
 

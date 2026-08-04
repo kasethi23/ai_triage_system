@@ -11,6 +11,8 @@ struct CallDetailView: View {
     @State private var call: Call?
     @State private var player = VoicemailPlayer()
     @State private var isResolving = false
+    @State private var isRevealed = false
+    @State private var isRevealing = false
 
     var body: some View {
         Group {
@@ -27,7 +29,9 @@ struct CallDetailView: View {
             call = await store.call(id: callID)
         }
         .onChange(of: store.calls) { _, _ in
-            if let updated = store.calls.first(where: { $0.id == callID }) {
+            // Don't let the background poll replace a revealed record with the
+            // redacted list copy — keep the identified view stable once shown.
+            if !isRevealed, let updated = store.calls.first(where: { $0.id == callID }) {
                 call = updated
             }
         }
@@ -67,13 +71,38 @@ struct CallDetailView: View {
             .buttonStyle(.plain)
 
             HStack(spacing: Organic.space2) {
-                Text(call.severity.displayName.uppercased())
-                    .font(Organic.body(10.5, weight: .bold))
-                    .tracking(0.84)
+                // Tapping the severity chip lets the physician reclassify the
+                // call (correction feedback loop — the override is recorded
+                // server-side as a few-shot candidate).
+                Menu {
+                    ForEach(Severity.allCases, id: \.self) { severity in
+                        Button {
+                            Task { await correct(to: severity) }
+                        } label: {
+                            if severity == call.severity {
+                                Label(severity.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(severity.displayName)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(call.severity.displayName.uppercased())
+                            .font(Organic.body(10.5, weight: .bold))
+                            .tracking(0.84)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8, weight: .bold))
+                    }
                     .foregroundStyle(Organic.bg)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
                     .background(call.severity.organicColor, in: Capsule())
+                }
+                .accessibilityLabel("Reclassify severity")
+                if call.insufficientDetail {
+                    NeedsReviewBadge()
+                }
                 Text("Received \(call.arrivalClock) \(call.arrivalMeridiem) · \(call.elapsedSinceArrival) ago")
                     .font(Organic.body(13, weight: .bold))
                     .foregroundStyle(call.severity.organicColor)
@@ -86,11 +115,55 @@ struct CallDetailView: View {
             Text(contextLine(for: call))
                 .font(Organic.body(14))
                 .foregroundStyle(Organic.neutral700)
+
+            Button {
+                Task { await revealIdentifiers() }
+            } label: {
+                HStack(spacing: 6) {
+                    if isRevealing {
+                        ProgressView()
+                    } else {
+                        Image(systemName: isRevealed ? "eye.fill" : "eye")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    Text(isRevealed ? "Identifiers revealed (access logged)" : "Reveal identifiers")
+                        .font(Organic.body(13, weight: .bold))
+                }
+                .foregroundStyle(isRevealed ? Organic.neutral600 : Organic.accent700)
+            }
+            .buttonStyle(.plain)
+            .disabled(isRevealed || isRevealing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(EdgeInsets(top: 2, leading: Organic.space4,
                             bottom: Organic.space4, trailing: Organic.space4))
         .background(Organic.surface)
+    }
+
+    /// Records a physician severity override and refreshes the displayed
+    /// record (re-fetching the identified copy if identifiers were revealed).
+    private func correct(to severity: Severity) async {
+        guard let current = call, severity != current.severity else { return }
+        guard await store.correct(current, severity: severity) else { return }
+        if isRevealed {
+            if let identified = await store.identifiedCall(id: callID) {
+                call = identified
+            }
+        } else if let updated = store.calls.first(where: { $0.id == callID }) {
+            call = updated
+        }
+    }
+
+    /// Swaps the displayed record for the re-identified one (P7 audited path).
+    /// The store's `calls` list is untouched — the inbox stays redacted.
+    private func revealIdentifiers() async {
+        guard !isRevealed else { return }
+        isRevealing = true
+        defer { isRevealing = false }
+        if let identified = await store.identifiedCall(id: callID) {
+            call = identified
+            isRevealed = true
+        }
     }
 
     private func contextLine(for call: Call) -> String {
@@ -102,6 +175,7 @@ struct CallDetailView: View {
                          : "\(call.callerName) (\(call.callerRole))")
         }
         parts.append("confidence \(call.confidence.formatted(.percent.precision(.fractionLength(0))))")
+        if call.noCallback { parts.append("caller says no callback needed") }
         return parts.joined(separator: " · ")
     }
 

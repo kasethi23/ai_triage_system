@@ -47,8 +47,31 @@ struct APIClient {
         try await get("calls/\(id)")
     }
 
+    /// Re-identified record (real names, restored transcript). The backend
+    /// LOGS this access (privacy P7) — call it only on explicit user action.
+    func getIdentifiedCall(id: Int) async throws -> Call {
+        try await get("calls/\(id)/identified")
+    }
+
     func resolveCall(id: Int) async throws -> Call {
         try await send("calls/\(id)/resolve", method: "PATCH")
+    }
+
+    /// Records a physician override (correction feedback loop, Task 12) and
+    /// returns the updated call. The correction becomes a candidate for the
+    /// classifier's few-shot pool via a separate human-approved promotion step.
+    func correctCall(id: Int, field: String = "severity", label: String) async throws -> Call {
+        struct CorrectionIn: Encodable {
+            let correctedField: String
+            let correctedLabel: String
+        }
+        var request = makeRequest(path: "calls/\(id)/correct", method: "PATCH")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        request.httpBody = try encoder.encode(CorrectionIn(correctedField: field, correctedLabel: label))
+        let data = try await perform(request)
+        return try decode(data)
     }
 
     @discardableResult

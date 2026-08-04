@@ -50,6 +50,32 @@ final class CallStore {
         }
     }
 
+    /// Fetches the re-identified record (privacy P7 — the access is audited
+    /// server-side). Deliberately NOT cached into `calls`: the list stays
+    /// redacted; only the requesting view holds the identified copy.
+    func identifiedCall(id: Int) async -> Call? {
+        do {
+            return try await api.getIdentifiedCall(id: id)
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    /// Records a physician severity override (correction feedback loop) and
+    /// applies the server's updated record.
+    func correct(_ call: Call, severity: Severity) async -> Bool {
+        do {
+            let updated = try await api.correctCall(id: call.id, label: severity.rawValue)
+            upsert(updated)
+            await syncBadge()
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
     /// Optimistically marks a call resolved; rolls back if the request fails.
     func resolve(_ call: Call) async -> Bool {
         guard let index = calls.firstIndex(where: { $0.id == call.id }) else { return false }
@@ -90,8 +116,10 @@ final class CallStore {
     var resolved: [Call] { sorted(calls.filter(\.resolved)) }
 
     // Inbox groups (design: oldest arrival first, consistently, in all groups).
+    // Insufficient-detail calls are excluded here — their severity is a best
+    // guess, so they get their own group (`needsReviewGroup`) instead.
     private func oldestFirst(_ severities: Set<Severity>) -> [Call] {
-        calls.filter { !$0.resolved && severities.contains($0.severity) }
+        calls.filter { !$0.resolved && !$0.insufficientDetail && severities.contains($0.severity) }
             .sorted { $0.receivedAt < $1.receivedAt }
     }
 
@@ -99,6 +127,13 @@ final class CallStore {
     var urgentGroup: [Call] { oldestFirst([.urgent]) }
     /// Routine and FYI merged — membership in the group is the signal.
     var laterGroup: [Call] { oldestFirst([.routine, .fyi]) }
+    /// Calls the classifier could not reliably triage (insufficient_detail):
+    /// severity is unknown, so they need a callback to clarify rather than a
+    /// place in the severity ranking.
+    var needsReviewGroup: [Call] {
+        calls.filter { !$0.resolved && $0.insufficientDetail }
+            .sorted { $0.receivedAt < $1.receivedAt }
+    }
 
     /// Badge = calls with a callback clock (critical + urgent), not total.
     var alertingCount: Int { criticalGroup.count + urgentGroup.count }

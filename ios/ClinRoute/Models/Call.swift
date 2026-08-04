@@ -60,11 +60,53 @@ struct Call: Codable, Identifiable, Equatable {
     let suggestedAction: String
     let rawClassificationJson: String
     let severity: Severity
+    /// Classifier flag: the transcript lacked the information needed to triage
+    /// (best-guess severity only — surface for review, don't act blindly).
+    let insufficientDetail: Bool
+    /// Classifier flag: the caller explicitly said no response/callback is
+    /// needed (a loop-closing FYI). Distinct from low severity.
+    let noCallback: Bool
     let patientName: String
     let room: String
     let callerName: String
     let callerRole: String
     var resolved: Bool
+
+    /// The default API payload is redacted by construction (backend privacy P4):
+    /// `patient_name`, `room`, `caller_name`, and `caller_role` are omitted from
+    /// `/calls`. Decode them when present, otherwise fall back to the copies the
+    /// classifier left in `raw_classification_json`, then to empty defaults —
+    /// never fail the whole payload over a redacted identifier.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        callSid = try c.decode(String.self, forKey: .callSid)
+        fromNumber = try c.decode(String.self, forKey: .fromNumber)
+        receivedAt = try c.decode(String.self, forKey: .receivedAt)
+        audioPath = try c.decode(String.self, forKey: .audioPath)
+        transcript = try c.decode(String.self, forKey: .transcript)
+        urgency = try c.decode(String.self, forKey: .urgency)
+        requestType = try c.decode(String.self, forKey: .requestType)
+        confidence = try c.decode(Double.self, forKey: .confidence)
+        summary = try c.decode(String.self, forKey: .summary)
+        suggestedAction = try c.decode(String.self, forKey: .suggestedAction)
+        rawClassificationJson = try c.decode(String.self, forKey: .rawClassificationJson)
+        severity = try c.decode(Severity.self, forKey: .severity)
+        insufficientDetail = try c.decodeIfPresent(Bool.self, forKey: .insufficientDetail) ?? false
+        noCallback = try c.decodeIfPresent(Bool.self, forKey: .noCallback) ?? false
+        resolved = try c.decode(Bool.self, forKey: .resolved)
+
+        let raw = (try? JSONSerialization.jsonObject(with: Data(rawClassificationJson.utf8)))
+            as? [String: Any] ?? [:]
+        patientName = try c.decodeIfPresent(String.self, forKey: .patientName)
+            ?? raw["patient_name"] as? String ?? "Unknown"
+        room = try c.decodeIfPresent(String.self, forKey: .room)
+            ?? raw["room"] as? String ?? ""
+        callerName = try c.decodeIfPresent(String.self, forKey: .callerName)
+            ?? raw["caller_name"] as? String ?? ""
+        callerRole = try c.decodeIfPresent(String.self, forKey: .callerRole)
+            ?? raw["caller_role"] as? String ?? ""
+    }
 }
 
 extension Call {
